@@ -470,35 +470,50 @@ function noteCity(savedAt) {
   cityNote.textContent = `${CITY.name} saved for instant search · updated ${d}`;
 }
 
+// Slow path: ask the map servers for all of Oslo (~30 s). Only used if the ready-made file isn't available.
 function downloadCity() {
   cityNote.textContent = `Saving ${CITY.name} for instant search…`;
   const q = `[out:json][timeout:180];nwr["amenity"~"^(${ALL_AMENITIES.join("|")})$"](${CITY.s},${CITY.w},${CITY.n},${CITY.e});out center tags;`;
-  cityPromise = raceServers(q, 200000).then(elements => {
+  return raceServers(q, 200000).then(elements => {
     const list = toPlaces(elements);
-    const t = Date.now();
-    try { localStorage.setItem(CITY_KEY, JSON.stringify({ t, rows: list.map(pack) })); } catch {}
-    cityPlaces = list;
-    noteCity(t);
+    useCity({ t: Date.now(), rows: list.map(pack) });
     return list;
-  }).catch(e => {
-    cityPromise = null;
-    if (!cityPlaces) cityNote.textContent = `Couldn't save ${CITY.name} yet. It will try again next time you open the page.`;
-    throw e;
   });
-  cityPromise.catch(() => {});
-  return cityPromise;
+}
+
+// Fast path: oslo.json sits next to the page on GitHub and is rebuilt weekly by a GitHub Action.
+async function fetchCityFile() {
+  const res = await fetchWithTimeout("oslo.json", { cache: "no-cache" }, 15000);
+  if (!res.ok) throw new Error("no city file");
+  const data = await res.json();
+  if (!data || !Array.isArray(data.rows) || !data.rows.length) throw new Error("bad city file");
+  return data;
+}
+
+function useCity(data) {
+  try { localStorage.setItem(CITY_KEY, JSON.stringify(data)); } catch {}
+  cityPlaces = data.rows.map(unpack);
+  noteCity(data.t);
+  return cityPlaces;
 }
 
 (function initCity() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(CITY_KEY) || "null"); } catch {}
-  if (saved && Array.isArray(saved.rows)) {
-    cityPlaces = saved.rows.map(unpack);
-    noteCity(saved.t);
-    if (Date.now() - saved.t > CITY_MAX_AGE) downloadCity(); // refresh quietly, keep using the old copy meanwhile
-  } else {
-    downloadCity();
-  }
+  if (saved && Array.isArray(saved.rows)) { cityPlaces = saved.rows.map(unpack); noteCity(saved.t); }
+  const age = saved ? Date.now() - saved.t : Infinity;
+  if (age < 12 * 60 * 60 * 1000) return;            // fresh enough, nothing to do
+
+  if (!saved) cityNote.textContent = `Saving ${CITY.name} for instant search…`;
+  cityPromise = fetchCityFile()
+    .then(data => (!saved || data.t > saved.t) ? useCity(data) : cityPlaces)
+    .catch(() => (!saved || age > CITY_MAX_AGE) ? downloadCity() : cityPlaces)
+    .catch(e => {
+      if (!cityPlaces) cityNote.textContent = `Couldn't save ${CITY.name} yet. It will try again next time you open the page.`;
+      throw e;
+    })
+    .finally(() => { cityPromise = null; });
+  cityPromise.catch(() => {});
 })();
 
 async function fetchPlaces(pos, radius) {
