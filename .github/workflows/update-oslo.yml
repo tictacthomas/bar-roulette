@@ -13,10 +13,13 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - name: Download and trim Oslo places
+        env:
+          PYTHONUNBUFFERED: "1"
         run: |
           python3 - <<'PY'
           import json, time, urllib.parse, urllib.request
@@ -36,11 +39,12 @@ jobs:
           body = urllib.parse.urlencode({"data": q}).encode()
 
           data = None
-          for attempt in range(3):
+          for attempt in range(2):
               for url in SERVERS:
+                  print("Trying", url, "...")
                   try:
                       req = urllib.request.Request(url, data=body, headers={"User-Agent": "bar-roulette-weekly-update"})
-                      with urllib.request.urlopen(req, timeout=240) as r:
+                      with urllib.request.urlopen(req, timeout=120) as r:
                           j = json.load(r)
                       if j.get("remark") or not j.get("elements"):
                           raise RuntimeError(j.get("remark") or "empty result")
@@ -51,7 +55,8 @@ jobs:
                       print("Failed:", url, e)
               if data:
                   break
-              time.sleep(60)
+              print("All servers failed, waiting 30 s and trying again")
+              time.sleep(30)
           if not data:
               raise SystemExit("No map server answered")
 
