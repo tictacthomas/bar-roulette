@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bar Roulette</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b8336a">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bar Roulette">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -72,10 +80,12 @@ h1 { font-size: clamp(2.2rem, 9vw, 3.2rem); font-weight: 800; line-height: 1; ma
 .pill { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; border-radius: 999px; padding: 2px 9px; border: 1px solid currentColor; }
 .pill.open { color: var(--open); }
 .pill.unknown { color: var(--muted); }
-.links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+/* the three result links always share one row */
+.links { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 4px; }
 .links a {
-  font-family: var(--mono); font-size: 0.82rem; color: var(--ink);
-  text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+  flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--mono); font-size: 0.78rem; color: var(--ink);
+  text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 7px 6px;
 }
 .links a:hover { border-color: var(--accent); color: var(--accent); }
 a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -125,6 +135,14 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
 .manual button:hover { border-color: var(--accent); color: var(--accent); }
 .settings { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; margin: 0; display: grid; gap: 10px; min-width: 0; }
 .settings legend { padding: 0 6px; }
+.suggest { display: grid; gap: 6px; margin-top: -2px; }
+.suggest button {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%;
+  font: inherit; text-align: left; cursor: pointer; color: var(--ink);
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+.suggest button:hover, .suggest button:focus-visible { border-color: var(--accent); }
+.suggest small { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; color: var(--muted); }
 .check input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
 
@@ -204,9 +222,11 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
   <form class="manual" id="manual">
     <label class="label" for="addr">Or set an address</label>
     <div class="row">
-      <input id="addr" type="text" placeholder="Street, place or landmark" autocomplete="street-address">
+      <input id="addr" type="text" placeholder="Street, place or landmark" autocomplete="off"
+        role="combobox" aria-autocomplete="list" aria-controls="suggest" aria-expanded="false">
       <button type="submit">Set</button>
     </div>
+    <div class="suggest" id="suggest" role="listbox" hidden></div>
   </form>
 
   <fieldset class="settings">
@@ -413,15 +433,33 @@ async function fetchWithTimeout(url, opts, ms) {
   finally { clearTimeout(t); }
 }
 
+// Address lookup: tries inside Oslo first (fast and avoids look-alike names elsewhere),
+// then Norway, then anywhere. Answers are remembered, so the same text is instant next time.
 async function geocode(text) {
-  const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(text);
-  let res;
-  try { res = await fetchWithTimeout(url, { headers: { "Accept": "application/json" } }, 8000); }
-  catch { throw new Error("The address lookup took too long. Try again."); }
-  if (!res.ok) throw new Error("The address lookup didn't answer. Try again in a minute.");
-  const data = await res.json();
-  if (!data.length) throw new Error(`Couldn't find "${text}". Try adding the city, like "Olav Tryggvasons gate 1, Trondheim".`);
-  return { lat: +data[0].lat, lon: +data[0].lon };
+  const key = "geo:" + text.toLowerCase();
+  try { const c = JSON.parse(localStorage.getItem(key) || "null"); if (c) return c; } catch {}
+  const base = "https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=no&q=" + encodeURIComponent(text);
+  const tries = [
+    `${base}&viewbox=${CITY.w},${CITY.n},${CITY.e},${CITY.s}&bounded=1`,
+    `${base}&countrycodes=no`,
+    base
+  ];
+  let answered = false;
+  for (const url of tries) {
+    let res;
+    try { res = await fetchWithTimeout(url, { headers: { "Accept": "application/json" } }, 8000); }
+    catch { continue; }
+    if (!res.ok) continue;
+    answered = true;
+    const data = await res.json();
+    if (!data.length) continue;
+    const name = data[0].display_name.split(",").slice(0, 2).map(x => x.trim()).join(", ");
+    const hit = { lat: +data[0].lat, lon: +data[0].lon, name };
+    try { localStorage.setItem(key, JSON.stringify(hit)); } catch {}
+    return hit;
+  }
+  if (!answered) throw new Error("The address lookup didn't answer. Try again in a minute.");
+  throw new Error(`Couldn't find "${text}". Check the spelling, or add the street and city, like "Karl Johans gate 1, Oslo".`);
 }
 
 /* ---------- place data ---------- */
@@ -577,7 +615,7 @@ function show(p, kind, status, how, fromBack) {
     top.append(back);
   }
   const lab = document.createElement("span"); lab.className = "label";
-  lab.textContent = [AMENITY_LABEL[p.amenity] || "Place", p.cuisine, how].filter(Boolean).join(" · ");
+  lab.textContent = [AMENITY_LABEL[p.amenity] || "Place", p.cuisine].filter(Boolean).join(" · ");
   top.append(lab);
   const h = document.createElement("h2"); h.className = "name"; h.textContent = p.name;
   const meta = document.createElement("div"); meta.className = "meta";
@@ -591,11 +629,36 @@ function show(p, kind, status, how, fromBack) {
   hr.append(pill, ht); ticket.append(hr);
   if (p.addr) { const a = document.createElement("p"); a.className = "addr"; a.textContent = p.addr; ticket.append(a); }
   const links = document.createElement("div"); links.className = "links";
-  const dir = `https://www.google.com/maps/dir/?api=1&origin=${here.lat},${here.lon}&destination=${p.lat},${p.lon}&travelmode=walking`;
+  // From GPS: let Maps use your live position. From a typed address: start there.
+  const fromGps = here.label === "your location";
+  const dest = `${p.lat},${p.lon}`;
+  const dirWeb = `https://www.google.com/maps/dir/?api=1${fromGps ? "" : `&origin=${here.lat},${here.lon}`}&destination=${dest}&travelmode=walking`;
+  const dirIos = `comgooglemaps://?${fromGps ? "" : `saddr=${here.lat},${here.lon}&`}daddr=${dest}&directionsmode=walking`;
+  // Search the name around the spot, so Maps opens the actual place (with photos and reviews), not just a pin.
+  const viewWeb = `https://www.google.com/maps/search/${encodeURIComponent(p.name)}/@${dest},18z`;
+  const viewIos = `comgooglemaps://?q=${encodeURIComponent(p.name)}&center=${dest}&zoom=18`;
   const mk = (href, text) => { const a = document.createElement("a"); a.href = href; a.target = "_blank"; a.rel = "noopener"; a.textContent = text; return a; };
-  links.append(mk(dir, "Walking directions"), mk("https://www.openstreetmap.org/" + p.id, "View on map"));
+  const mkMaps = (web, ios, text) => { const a = mk(web, text); a.addEventListener("click", ev => openInMaps(ev, web, ios)); return a; };
+  links.append(mkMaps(dirWeb, dirIos, "Directions"), mkMaps(viewWeb, viewIos, "Google Maps"));
   if (p.web) links.append(mk(p.web, "Website"));
   ticket.append(links);
+}
+
+// On phones, open the Google Maps app directly instead of a new browser tab.
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /android/i.test(navigator.userAgent);
+function openInMaps(ev, webUrl, iosUrl) {
+  if (IS_IOS) {
+    ev.preventDefault();
+    // Try the app; if it isn't installed the page stays visible, so fall back to the website.
+    const t = setTimeout(() => { if (!document.hidden) location.href = webUrl; }, 1200);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(t); }, { once: true });
+    location.href = iosUrl;
+  } else if (IS_ANDROID) {
+    ev.preventDefault();
+    location.href = webUrl;   // same tab: Android hands Google Maps links straight to the app
+  }
+  // Computers: normal link, opens Google Maps in a new tab.
 }
 
 function goBack() {
@@ -763,6 +826,104 @@ document.getElementById("eggClose").addEventListener("click", hideEgg);
 egg.addEventListener("click", ev => { if (ev.target === egg) hideEgg(); });
 document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !egg.hidden) hideEgg(); });
 
+/* Popular Oslo spots: built-in positions, so picking one needs no address lookup. */
+const SPOTS = [
+  ["Jernbanetorget", 59.9116, 10.7499, ["oslo s", "oslo sentralstasjon", "sentralstasjonen"]],
+  ["Youngstorget", 59.9150, 10.7495],
+  ["Majorstuen", 59.9297, 10.7148],
+  ["Grünerløkka", 59.9227, 10.7578, ["grunerlokka", "løkka", "lokka", "olaf ryes plass"]],
+  ["Nationaltheatret", 59.9146, 10.7335, ["nasjonalteateret", "nationalteateret", "nasjonaltheatret"]],
+  ["Aker Brygge", 59.9105, 10.7277],
+  ["Grønland", 59.9126, 10.7604, ["gronland"]],
+  ["Tøyen", 59.9150, 10.7740, ["toyen"]],
+  ["Karl Johans gate", 59.9133, 10.7420, ["karl johan", "egertorget"]],
+  ["Stortinget", 59.9130, 10.7400],
+  ["Vulkan / Mathallen", 59.9223, 10.7516, ["vulkan", "mathallen"]],
+  ["Bislett", 59.9255, 10.7325],
+  ["St. Hanshaugen", 59.9270, 10.7400, ["st hanshaugen", "sankt hanshaugen"]],
+  ["Alexander Kiellands plass", 59.9282, 10.7499, ["alexander kielland"]],
+  ["Torshov", 59.9339, 10.7637],
+  ["Sagene", 59.9373, 10.7522],
+  ["Carl Berners plass", 59.9265, 10.7780, ["carl berner"]],
+  ["Frogner (Solli plass)", 59.9145, 10.7225, ["frogner", "solli plass"]],
+  ["Bjørvika (Operaen)", 59.9075, 10.7531, ["bjørvika", "bjorvika", "operaen", "operahuset"]],
+  ["Tjuvholmen", 59.9070, 10.7210],
+  ["Kampen", 59.9135, 10.7810],
+  ["Storo", 59.9475, 10.7748]
+];
+const norm = t => t.toLowerCase().replace(/[.,]/g, "").replace(/\s+/g, " ").trim();
+function findSpot(text) {
+  const n = norm(text);
+  return SPOTS.find(([name, , , alias = []]) => norm(name) === n || alias.some(a => norm(a) === n));
+}
+// Own suggestion list: under the field, at most two, only once something is typed.
+(function suggestions() {
+  const input = document.getElementById("addr");
+  const box = document.getElementById("suggest");
+  const hide = () => { box.hidden = true; box.innerHTML = ""; input.setAttribute("aria-expanded", "false"); };
+  function matches(text) {
+    const n = norm(text);
+    if (!n) return [];
+    const scored = [];
+    for (const [name, , , alias = []] of SPOTS) {
+      const words = [name, ...alias].map(norm);
+      let score = Infinity;
+      for (const w of words) {
+        if (w.startsWith(n)) score = Math.min(score, 0);                          // starts with what you typed
+        else if (w.split(/[\s/()-]+/).some(part => part.startsWith(n))) score = Math.min(score, 1); // a word starts with it
+        else if (n.length >= 3 && w.includes(n)) score = Math.min(score, 2);      // somewhere inside
+      }
+      if (score < Infinity) scored.push([score, name]);
+    }
+    return scored.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1], "no")).slice(0, 2).map(x => x[1]);
+  }
+  function pick(name) {
+    input.value = name; hide(); input.blur(); setFromText(name);
+  }
+  input.addEventListener("input", () => {
+    const list = matches(input.value);
+    if (!list.length || (list.length === 1 && norm(list[0]) === norm(input.value))) return hide();
+    box.innerHTML = "";
+    list.forEach(name => {
+      const b = document.createElement("button");
+      b.type = "button"; b.setAttribute("role", "option");
+      const t = document.createElement("span"); t.textContent = name;
+      const sm = document.createElement("small"); sm.textContent = "Oslo";
+      b.append(t, sm);
+      // pointerdown so the tap counts before the field loses focus
+      b.addEventListener("pointerdown", ev => { ev.preventDefault(); pick(name); });
+      b.addEventListener("click", () => pick(name));   // keyboard Enter/Space
+      box.append(b);
+    });
+    box.hidden = false; input.setAttribute("aria-expanded", "true");
+  });
+  input.addEventListener("blur", () => setTimeout(() => { if (!box.contains(document.activeElement)) hide(); }, 150));
+  input.addEventListener("keydown", ev => {
+    if (ev.key === "Escape") hide();
+    if (ev.key === "ArrowDown" && !box.hidden) { ev.preventDefault(); box.querySelector("button")?.focus(); }
+  });
+  document.getElementById("manual").addEventListener("submit", hide);
+})();
+
+async function setFromText(text) {
+  buttons.forEach(b => b.disabled = true);
+  try {
+    const spot = findSpot(text);
+    let pos;
+    if (spot) pos = { lat: spot[1], lon: spot[2], name: spot[0] + ", Oslo" };   // instant
+    else { setState("Looking up that address…"); pos = await geocode(text); }
+    here = { lat: pos.lat, lon: pos.lon, label: pos.name || text }; places = null; placesRadius = 0; setFrom();
+    const r = Math.max(randomRadius(), CLOSEST_RADIUS);
+    setState(`Looking for places within ${fmtDist(r)}…`);
+    places = await fetchPlaces(here, r); placesRadius = r;
+    setState(`Found ${here.label}. Now pick a button.`);
+  } catch (e) {
+    setState(e.message, true);
+  } finally {
+    buttons.forEach(b => b.disabled = false);
+  }
+}
+
 document.getElementById("manual").addEventListener("submit", async ev => {
   ev.preventDefault();
   const input = document.getElementById("addr");
@@ -776,21 +937,14 @@ document.getElementById("manual").addEventListener("submit", async ev => {
     input.focus(); return;
   }
   emptyPresses = 0;
-  buttons.forEach(b => b.disabled = true);
-  try {
-    setState("Looking up that address…");
-    const pos = await geocode(text);
-    here = { ...pos, label: text }; places = null; placesRadius = 0; setFrom();
-    const r = Math.max(randomRadius(), CLOSEST_RADIUS);
-    setState(`Looking for places within ${fmtDist(r)}…`);
-    places = await fetchPlaces(here, r); placesRadius = r;
-    setState(`Set to ${text}. Now pick a button.`);
-  } catch (e) {
-    setState(e.message, true);
-  } finally {
-    buttons.forEach(b => b.disabled = false);
-  }
+  input.blur();   // close the phone keyboard
+  await setFromText(text);
 });
+
+// Make it installable as an app (only works when served over https, e.g. GitHub Pages)
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
 </script>
 </body>
 </html>
