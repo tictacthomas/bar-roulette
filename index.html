@@ -46,7 +46,7 @@ body {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-main { max-width: 480px; margin: 0 auto; display: grid; gap: 10px; }
+main { max-width: 480px; margin: 0 auto; display: grid; gap: 8px; }
 main > * { min-width: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 header { display: grid; gap: 4px; }
@@ -59,7 +59,7 @@ h1 { font-size: clamp(1.7rem, 7vw, 2.4rem); font-weight: 800; line-height: 1; ma
   /* fixed height: exactly fits a two-line name plus one line each of distance, hours, address and links */
   --name-size: clamp(1.8rem, 7vw, 2.4rem);
   padding: 16px 18px; display: grid; gap: 6px; align-content: start;
-  height: calc(0.9 * (2 * 1.05 * var(--name-size) + 220px)); overflow: hidden;
+  height: calc(0.81 * (2 * 1.05 * var(--name-size) + 220px)); overflow: hidden;
   position: relative;
 }
 .ticket::before, .ticket::after {
@@ -81,6 +81,8 @@ h1 { font-size: clamp(1.7rem, 7vw, 2.4rem); font-weight: 800; line-height: 1; ma
 .meta { display: flex; flex-wrap: nowrap; gap: 8px 16px; white-space: nowrap; font-family: var(--mono); font-size: 0.85rem; }
 .meta b { font-weight: 500; color: var(--accent); font-variant-numeric: tabular-nums; }
 .ticket.food .meta b { color: var(--food); }
+.addr b { font-family: var(--mono); font-size: 0.82rem; font-weight: 500; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ticket.food .addr b { color: var(--food); }
 .addr { color: var(--muted); margin: 0; font-size: 0.9rem; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hours { display: flex; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; align-items: center; gap: 8px; margin: 0; font-family: var(--mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .hours > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -120,12 +122,14 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
 .range output { font-family: var(--mono); font-weight: 500; font-size: 1rem; color: var(--accent); font-variant-numeric: tabular-nums; }
 .range input { width: 100%; margin: 0; accent-color: var(--accent); height: 26px; }
 .range-ends { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
-.from { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+.from { display: flex; flex-wrap: nowrap; gap: 6px 10px; align-items: baseline; font-family: var(--mono); font-size: 0.8rem; color: var(--muted);
+  min-height: 1.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; visibility: hidden; }
+.from > span { overflow: hidden; text-overflow: ellipsis; }
 .from button { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
 
 .locate {
   font-family: var(--display); font-weight: 800; font-size: 1rem; cursor: pointer;
-  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 16px;
 }
 .locate:hover { border-color: var(--accent); color: var(--accent); }
 .locate:disabled { opacity: .6; cursor: progress; }
@@ -204,20 +208,21 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
   <div class="range">
     <div class="range-head">
       <label class="label" for="dist">Random search distance</label>
-      <output id="distOut" for="dist">700 m</output>
+      <output id="distOut" for="dist">500 m</output>
     </div>
-    <input type="range" id="dist" min="100" max="2000" step="100" value="700">
+    <input type="range" id="dist" min="100" max="2000" step="100" value="500" autocomplete="off">
   </div>
 
-  <div class="from" id="from" hidden>
+  <div class="from" id="from">
     <span id="fromText"></span>
     <span id="roughNote" hidden>Your phone is only sharing an approximate location.</span>
   </div>
 
+  <button type="button" class="locate" id="useLocation">◎ Use my location</button>
+
   <form class="manual" id="manual">
-    <label class="label" for="addr">Your location, or type a place</label>
+    <label class="label" for="addr">Or set an address</label>
     <div class="row">
-      <button type="button" class="locate-btn" id="useLocation" aria-label="Use my location" title="Use my location">◎</button>
       <input id="addr" type="text" placeholder="Street, place or landmark" autocomplete="off"
         role="combobox" aria-autocomplete="list" aria-controls="suggest" aria-expanded="false">
       <button type="submit">Set</button>
@@ -228,10 +233,10 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
   <fieldset class="settings">
     <legend class="visually-hidden">Settings</legend>
     <label class="check"><input type="checkbox" id="takeawayOnly" checked> Food: takeaway only (no restaurants)</label>
-    <label class="check"><input type="checkbox" id="skipUnknown"> Skip places that don't list opening hours</label>
+    <label class="check"><input type="checkbox" id="skipUnknown" checked> Skip places that don't list opening hours</label>
   </fieldset>
 
-  <div class="foot">
+  <div class="foot" hidden>
     <span id="count"></span>
     <span id="cityNote"></span>
     <span>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></span>
@@ -248,12 +253,13 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
 
 <script>
 /* ---------- settings ---------- */
-const CLOSEST_RADIUS = 700;   // "Closest" always searches at least this far
+const CLOSEST_RADIUS = 2000;  // "Closest" always searches this far, whatever the slider says
 const distInput = document.getElementById("dist");
 const distOut = document.getElementById("distOut");
 const fmtDist = m => m >= 1000 ? (m / 1000).toLocaleString("en", { maximumFractionDigits: 1 }) + " km" : m + " m";
 const randomRadius = () => +distInput.value;
 distInput.addEventListener("input", () => { distOut.textContent = fmtDist(randomRadius()); });
+distOut.textContent = fmtDist(randomRadius());
 const KINDS = {
   bar:  { amenities: ["bar", "pub"], noun: "bar" },
   food: { amenities: ["restaurant", "fast_food", "food_court"], noun: "place to eat" }
@@ -605,16 +611,18 @@ function show(p, kind, status, how, fromBack) {
   top.append(lab);
   if (how) { const c = document.createElement("span"); c.className = "left-count"; c.textContent = how; top.append(c); }
   const h = document.createElement("h2"); h.className = "name"; h.textContent = p.name;
-  const meta = document.createElement("div"); meta.className = "meta";
-  meta.innerHTML = `<span><b>${Math.round(p.dist)} m</b> away</span><span><b>~${walk} min</b> walk</span>`;
-  ticket.append(top, h, meta);
+  ticket.append(top, h);
   const hr = document.createElement("p"); hr.className = "hours";
   const pill = document.createElement("span");
   pill.className = "pill " + (status.state === "open" ? "open" : "unknown");
   pill.textContent = status.state === "open" ? "Open now" : "Check hours";
   const ht = document.createElement("span"); ht.textContent = status.text;
   hr.append(pill, ht); ticket.append(hr);
-  if (p.addr) { const a = document.createElement("p"); a.className = "addr"; a.textContent = p.addr; ticket.append(a); }
+  // distance and address share one line to keep the box short
+  const a = document.createElement("p"); a.className = "addr";
+  const d = document.createElement("b"); d.textContent = `${Math.round(p.dist)} m · ~${walk} min`;
+  a.append(d); if (p.addr) a.append(" · " + p.addr);
+  ticket.append(a);
   const links = document.createElement("div"); links.className = "links";
   // From GPS: let Maps use your live position. From a typed address: start there.
   const fromGps = here.label === "your location";
@@ -672,7 +680,8 @@ async function spinThrough(list) {
 
 /* ---------- main flow ---------- */
 function setFrom() {
-  fromBox.hidden = !here;
+  // the line always takes up the same space, so setting a location never moves the page
+  fromBox.style.visibility = here ? "visible" : "hidden";
   if (!here) return;
   let txt = "Searching from: " + here.label;
   if (here.acc) txt += ` (±${here.acc >= 1000 ? (here.acc / 1000).toFixed(1) + " km" : Math.round(here.acc) + " m"})`;
@@ -698,10 +707,9 @@ async function ensurePlaces(radius) {
 async function find(kind, mode) {
   buttons.forEach(b => b.disabled = true);
   try {
-    const rRandom = randomRadius();
-    // Always fetch at least 700 m so the Closest buttons work straight after a small random search.
-    await ensurePlaces(Math.max(rRandom, CLOSEST_RADIUS));
-    const limit = mode === "random" ? rRandom : placesRadius;
+    // Random uses the slider; Closest ignores it and always looks up to 2 km away.
+    const limit = mode === "random" ? randomRadius() : CLOSEST_RADIUS;
+    await ensurePlaces(limit);
     const now = new Date();
     const all = places.filter(p => (kind === "food" ? foodAmenities() : KINDS.bar.amenities).includes(p.amenity) && p.dist <= limit)
       .map(p => ({ p, st: hoursStatus(p.hours, now) }));
@@ -758,7 +766,7 @@ document.getElementById("useLocation").addEventListener("click", async () => {
     setState("Finding where you are…");
     const pos = await getPosition();
     here = { ...pos, label: "your location" }; places = null; placesRadius = 0; setFrom();
-    const r = Math.max(randomRadius(), CLOSEST_RADIUS);
+    const r = randomRadius();
     setState(`Looking for places within ${fmtDist(r)}…`);
     places = await fetchPlaces(here, r); placesRadius = r;
     setState("Using your location. Now pick a button.");
@@ -777,8 +785,6 @@ function showEgg() {
 }
 function hideEgg() { egg.hidden = true; }
 document.getElementById("eggClose").addEventListener("click", hideEgg);
-egg.addEventListener("click", ev => { if (ev.target === egg) hideEgg(); });
-document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !egg.hidden) hideEgg(); });
 
 /* Popular Oslo spots: built-in positions, so picking one needs no address lookup. */
 const SPOTS = [
@@ -867,7 +873,7 @@ async function setFromText(text) {
     if (spot) pos = { lat: spot[1], lon: spot[2], name: spot[0] + ", Oslo" };   // instant
     else { setState("Looking up that address…"); pos = await geocode(text); }
     here = { lat: pos.lat, lon: pos.lon, label: pos.name || text }; places = null; placesRadius = 0; setFrom();
-    const r = Math.max(randomRadius(), CLOSEST_RADIUS);
+    const r = randomRadius();
     setState(`Looking for places within ${fmtDist(r)}…`);
     places = await fetchPlaces(here, r); placesRadius = r;
     setState(`Found ${here.label}. Now pick a button.`);
@@ -888,7 +894,7 @@ document.getElementById("manual").addEventListener("submit", async ev => {
     emptyPresses = t - lastEmptyPress < 700 ? emptyPresses + 1 : 1;
     lastEmptyPress = t;
     if (emptyPresses >= 5) { emptyPresses = 0; showEgg(); return; }
-    input.focus(); return;
+    return;   // don't focus the field: that pops up the keyboard and shifts the page
   }
   emptyPresses = 0;
   input.blur();   // close the phone keyboard
