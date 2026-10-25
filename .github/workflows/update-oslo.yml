@@ -1,0 +1,86 @@
+name: Update Oslo data
+
+# Rebuilds oslo.json (all bars, pubs, restaurants and takeaways in Oslo from OpenStreetMap)
+# every Monday night, and whenever you press "Run workflow" on the Actions tab.
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and trim Oslo places
+        run: |
+          python3 - <<'PY'
+          import json, time, urllib.parse, urllib.request
+
+          S, W, N, E = 59.78, 10.40, 60.02, 11.00
+          AMENITIES = ["bar", "pub", "restaurant", "fast_food", "food_court"]
+          LABEL = {"bar": "bar", "pub": "pub", "restaurant": "restaurant",
+                   "fast_food": "takeaway", "food_court": "food court"}
+          SERVERS = [
+              "https://overpass-api.de/api/interpreter",
+              "https://overpass.private.coffee/api/interpreter",
+              "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+              "https://overpass.kumi.systems/api/interpreter",
+          ]
+          q = ('[out:json][timeout:180];nwr["amenity"~"^(%s)$"](%s,%s,%s,%s);out center tags;'
+               % ("|".join(AMENITIES), S, W, N, E))
+          body = urllib.parse.urlencode({"data": q}).encode()
+
+          data = None
+          for attempt in range(3):
+              for url in SERVERS:
+                  try:
+                      req = urllib.request.Request(url, data=body, headers={"User-Agent": "bar-roulette-weekly-update"})
+                      with urllib.request.urlopen(req, timeout=240) as r:
+                          j = json.load(r)
+                      if j.get("remark") or not j.get("elements"):
+                          raise RuntimeError(j.get("remark") or "empty result")
+                      data = j
+                      print("Got", len(j["elements"]), "places from", url)
+                      break
+                  except Exception as e:
+                      print("Failed:", url, e)
+              if data:
+                  break
+              time.sleep(60)
+          if not data:
+              raise SystemExit("No map server answered")
+
+          rows = []
+          for el in data["elements"]:
+              lat = el.get("lat", el.get("center", {}).get("lat"))
+              lon = el.get("lon", el.get("center", {}).get("lon"))
+              if lat is None or lon is None:
+                  continue
+              t = el.get("tags", {})
+              street = " ".join(x for x in [t.get("addr:street"), t.get("addr:housenumber")] if x)
+              addr = ", ".join(x for x in [street, t.get("addr:city")] if x)
+              rows.append([
+                  f'{el["type"]}/{el["id"]}', round(lat, 6), round(lon, 6), t.get("amenity", ""),
+                  t.get("name") or "Unnamed " + LABEL.get(t.get("amenity"), "place"),
+                  (t.get("cuisine") or "").split(";")[0].replace("_", " "),
+                  addr, t.get("opening_hours", ""), t.get("website") or t.get("contact:website", ""),
+              ])
+
+          out = {"t": int(time.time() * 1000), "rows": rows}
+          with open("oslo.json", "w", encoding="utf-8") as f:
+              json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+          print("Wrote", len(rows), "places")
+          PY
+
+      - name: Save to the repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add oslo.json
+          git commit -m "Update Oslo data" || echo "No changes"
+          git push
