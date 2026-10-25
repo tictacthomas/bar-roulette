@@ -132,10 +132,7 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
   background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 16px;
 }
 .locate:hover { border-color: var(--accent); color: var(--accent); }
-.install-card { text-align: left; justify-items: stretch; animation: none; }
-.install-card h2 { font-size: 1.5rem; }
-.install-card ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
-.install-card button { justify-self: start; }
+
 .locate:disabled { opacity: .6; cursor: progress; }
 .manual { display: grid; gap: 6px; }
 .manual .locate-btn { flex: 0 0 auto; padding: 10px 12px; font-size: 1.05rem; line-height: 1; }
@@ -240,22 +237,12 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
     <label class="check"><input type="checkbox" id="skipUnknown" checked> Skip places that don't list opening hours</label>
   </fieldset>
 
-  <button type="button" class="locate" id="installBtn" hidden>＋ Add to home screen</button>
-
   <div class="foot" hidden>
     <span id="count"></span>
     <span id="cityNote"></span>
     <span>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></span>
   </div>
 </main>
-
-<div class="egg" id="install" hidden role="dialog" aria-modal="true" aria-labelledby="installTitle">
-  <div class="egg-card install-card">
-    <h2 id="installTitle">Add to home screen</h2>
-    <ol id="installSteps"></ol>
-    <button type="button" id="installClose">Got it</button>
-  </div>
-</div>
 
 <div class="egg" id="egg" hidden role="dialog" aria-modal="true" aria-labelledby="eggTitle">
   <div class="egg-card">
@@ -914,47 +901,6 @@ document.getElementById("manual").addEventListener("submit", async ev => {
   input.blur();   // close the phone keyboard
   await setFromText(text);
 });
-
-/* ---------- Add to home screen ----------
-   Android/Chrome lets the page show the real install prompt; iPhone doesn't, so there we show the steps. */
-(function installButton() {
-  const btn = document.getElementById("installBtn");
-  const box = document.getElementById("install");
-  const steps = document.getElementById("installSteps");
-  const installed = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-  if (installed) return;                         // already opened as an app: no button
-  btn.hidden = false;
-  let deferred = null;
-  window.addEventListener("beforeinstallprompt", ev => { ev.preventDefault(); deferred = ev; });
-  window.addEventListener("appinstalled", () => { btn.hidden = true; });
-  const showSteps = list => {
-    steps.innerHTML = "";
-    list.forEach(t => { const li = document.createElement("li"); li.textContent = t; steps.append(li); });
-    box.hidden = false; document.getElementById("installClose").focus();
-  };
-  btn.addEventListener("click", async () => {
-    if (deferred) {                               // Android Chrome: the real "Install app" prompt
-      deferred.prompt();
-      const choice = await deferred.userChoice.catch(() => null);
-      deferred = null;
-      if (choice && choice.outcome === "accepted") btn.hidden = true;
-      return;
-    }
-    const ua = navigator.userAgent;
-    if (/iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
-      showSteps(["Open this page in Safari.", "Tap the Share button (the square with an arrow pointing up).",
-                 "Scroll down and tap “Add to Home Screen”.", "Tap “Add”."]);
-    } else if (/android/i.test(ua)) {
-      showSteps(["Tap the ⋮ menu in the top-right corner of Chrome.", "Tap “Add to home screen” or “Install app”.",
-                 "Tap “Install” (or “Add”)."]);
-    } else {
-      showSteps(["In Chrome or Edge, click the install icon at the right end of the address bar,",
-                 "or open the ⋮ menu and choose “Install Bar Roulette” (or “Cast, save and share → Install page as app”)."]);
-    }
-  });
-  document.getElementById("installClose").addEventListener("click", () => { box.hidden = true; });
-  box.addEventListener("click", ev => { if (ev.target === box) box.hidden = true; });
-})();
 
 // Make it installable as an app (only works when served over https, e.g. GitHub Pages)
 if ("serviceWorker" in navigator && location.protocol === "https:") {
