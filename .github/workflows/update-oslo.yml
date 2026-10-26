@@ -4,6 +4,8 @@ name: Update Oslo data
 #  1. OpenStreetMap: bars, pubs, restaurants, takeaways, pharmacies, grocery stores and Vinmonopolet
 #  2. Brønnøysund Register + Kartverket: grocery stores and pharmacies that OpenStreetMap is missing
 #     (positions from Kartverket's address register, remembered in geocache.json)
+#  3. hours.json: your own opening hours, which override everything else
+#  Also writes missing-hours.csv: every grocery store, pharmacy and Vinmonopolet without opening hours.
 on:
   schedule:
     - cron: "17 3 * * 1"
@@ -230,6 +232,42 @@ jobs:
           with open(cache_file, "w", encoding="utf-8") as f:
               json.dump(geocache, f, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
+          # ---------- 3. Your own opening hours ----------
+          try:
+              own = json.load(open("hours.json", encoding="utf-8"))
+          except FileNotFoundError:
+              own = {}
+          except Exception as e:
+              raise SystemExit(f"hours.json has a mistake in it, so nothing was saved: {e}")
+          by_id = {k: v.strip() for k, v in own.items() if not k.startswith("_") and re.match(r"^(node|way|relation|brreg)/", k)}
+          by_name = {k.lower().strip(): v.strip() for k, v in own.items() if not k.startswith("_") and k not in by_id}
+          name_count = {}
+          for r in rows:
+              name_count[r[4].lower()] = name_count.get(r[4].lower(), 0) + 1
+          used, kept = 0, []
+          for r in rows:
+              v = by_id.get(r[0]) or (by_name.get(r[4].lower()) if name_count[r[4].lower()] == 1 else None)
+              if v and v.lower() == "closed":
+                  used += 1
+                  continue                          # shut down for good: leave it out
+              if v:
+                  r[7] = v
+                  used += 1
+              kept.append(r)
+          rows = kept
+          ambiguous = [k for k in by_name if name_count.get(k, 0) > 1]
+          print("hours.json: applied", used, "entries" + (f"; these names match several places, use the id instead: {ambiguous}" if ambiguous else ""))
+
+          # ---------- list of places still missing hours ----------
+          import csv
+          WANTED = {"supermarket": "Grocery", "convenience": "Grocery", "pharmacy": "Pharmacy", "vinmonopolet": "Vinmonopolet"}
+          missing = sorted((WANTED[r[3]], r[4], r[6], r[0]) for r in rows if r[3] in WANTED and not r[7])
+          with open("missing-hours.csv", "w", encoding="utf-8", newline="") as f:
+              w = csv.writer(f)
+              w.writerow(["type", "name", "address", "id"])
+              w.writerows(missing)
+          print("missing-hours.csv:", len(missing), "places without opening hours")
+
           out = {"v": 3, "t": int(time.time() * 1000), "rows": rows}
           with open("oslo.json", "w", encoding="utf-8") as f:
               json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
@@ -240,6 +278,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add oslo.json geocache.json
+          git add oslo.json geocache.json missing-hours.csv
           git commit -m "Update Oslo data" || echo "No changes"
           git push
