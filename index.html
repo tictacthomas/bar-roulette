@@ -193,9 +193,7 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
 }
 @keyframes wobble { 0%{transform:scale(.6) rotate(-6deg);opacity:0} 60%{transform:scale(1.05) rotate(2deg);opacity:1} 100%{transform:none} }
 @media (prefers-reduced-motion: reduce) { .egg-card { animation: none; } }
-@keyframes flick { 0%{opacity:.3} 50%{opacity:1} 100%{opacity:.3} }
-.spinning { animation: flick .3s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .spinning { animation: none; } .finders button { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .finders button { transition: none; } }
 </style>
 </head>
 <body>
@@ -743,17 +741,6 @@ function goBack() {
   show(prev.p, prev.kind, hoursStatus(prev.p.hours, new Date()), "", true);
 }
 
-async function spinThrough(list) {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches || list.length < 2) return;
-  for (let i = 0; i < 6; i++) {
-    const p = list[Math.floor(Math.random() * list.length)];
-    ticket.innerHTML = `<span class="label">Spinning…</span>`;
-    const h = document.createElement("h2"); h.className = "name spinning"; h.textContent = p.name;
-    ticket.append(h);
-    await new Promise(r => setTimeout(r, 40 + i * 12));
-  }
-}
-
 /* ---------- main flow ---------- */
 function setFrom() {
   // the line always takes up the same space, so setting a location never moves the page
@@ -817,7 +804,6 @@ async function find(kind, mode) {
         pool.forEach(x => seen.delete(x.p.id));
         choices = pool.length > 1 ? pool.filter(x => x.p.id !== lastPick[kind]) : pool;
       }
-      await spinThrough(choices.map(x => x.p));
       pick = choices[Math.floor(Math.random() * choices.length)];
       lastPick[kind] = pick.p.id;
       seen.add(pick.p.id);
