@@ -768,8 +768,12 @@ async function find(kind, mode) {
       let how = "";
       let choices = pool.filter(x => !seen.has(x.p.id));
       if (!choices.length) {
+        // Seen them all: start over, but count the one on screen as already seen
+        // so it isn't shown again straight away and the count keeps going down.
         pool.forEach(x => seen.delete(x.p.id));
-        choices = pool.length > 1 ? pool.filter(x => x.p.id !== lastPick[kind]) : pool;
+        if (pool.length > 1 && lastPick[kind]) seen.add(lastPick[kind]);
+        choices = pool.filter(x => !seen.has(x.p.id));
+        if (!choices.length) choices = pool;
       }
       pick = choices[Math.floor(Math.random() * choices.length)];
       lastPick[kind] = pick.p.id;
