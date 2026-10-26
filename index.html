@@ -114,7 +114,16 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
 .finders .closest { background: transparent; color: var(--ink); }
 .finders .closest.bar { border-color: var(--accent); }
 .finders .closest.food { border-color: var(--food); }
-.finders .closest.other { border-color: var(--muted); }
+/* extra row: one button fills the row, three share it */
+.extras { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; }
+.extras button {
+  font-family: var(--display); font-weight: 800; font-size: 0.95rem; line-height: 1.15;
+  border-radius: 14px; padding: 8px 10px; min-height: 52px; cursor: pointer;
+  background: transparent; color: var(--ink); border: 2px solid var(--muted); transition: transform .12s ease;
+}
+.extras button small { display: block; font-family: var(--mono); font-weight: 400; font-size: 0.7rem; letter-spacing: 0.04em; opacity: .85; margin-top: 2px; }
+.extras button:active { transform: scale(0.98); }
+.extras button:disabled { opacity: .6; cursor: progress; }
 .finders button:active { transform: scale(0.98); }
 .finders button:disabled { opacity: .6; cursor: progress; }
 
@@ -205,8 +214,11 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
     <button class="closest bar" id="nearBar" type="button">Closest bar<small>nearest open</small></button>
     <button class="random food" id="randFood" type="button">Random food<small class="foodKind">takeaway only</small></button>
     <button class="closest food" id="nearFood" type="button">Closest food<small class="foodKind">takeaway only</small></button>
-    <button class="closest other" id="nearPharmacy" type="button" hidden>Closest pharmacy<small>nearest open</small></button>
-    <button class="closest other" id="nearGrocery" type="button" hidden>Closest grocery<small>nearest open</small></button>
+  </div>
+  <div class="extras">
+    <button class="closest other" id="nearPolet" type="button">Polet<small>nearest open</small></button>
+    <button class="closest other" id="nearPharmacy" type="button" hidden>Pharmacy<small>nearest open</small></button>
+    <button class="closest other" id="nearGrocery" type="button" hidden>Grocery<small>nearest open</small></button>
   </div>
 
   <div class="range">
@@ -269,14 +281,15 @@ const KINDS = {
   bar:      { amenities: ["bar", "pub"], noun: "bar" },
   food:     { amenities: ["restaurant", "fast_food", "food_court"], noun: "place to eat" },
   pharmacy: { amenities: ["pharmacy"], noun: "pharmacy" },
-  grocery:  { amenities: ["supermarket", "convenience"], noun: "grocery store" }
+  grocery:  { amenities: ["supermarket", "convenience"], noun: "grocery store" },
+  polet:    { amenities: ["vinmonopolet"], noun: "Vinmonopolet" }
 };
 // what to ask the map for: these "amenity" values plus these "shop" values
 const ALL_AMENITIES = ["bar", "pub", "restaurant", "fast_food", "food_court", "pharmacy"];
-const ALL_SHOPS = ["supermarket", "convenience"];
+const ALL_SHOPS = ["supermarket", "convenience", "alcohol"];
 const placeQuery = area => `(nwr["amenity"~"^(${ALL_AMENITIES.join("|")})$"]${area};nwr["shop"~"^(${ALL_SHOPS.join("|")})$"]${area};);out center tags;`;
 const AMENITY_LABEL = { bar: "Bar", pub: "Pub", restaurant: "Restaurant", fast_food: "Takeaway", food_court: "Food court",
-  pharmacy: "Pharmacy", supermarket: "Supermarket", convenience: "Convenience store" };
+  pharmacy: "Pharmacy", supermarket: "Supermarket", convenience: "Convenience store", vinmonopolet: "Vinmonopolet" };
 const ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
@@ -357,7 +370,7 @@ function hoursStatus(raw, now) {
 /* ---------- page state ---------- */
 const ticket = document.getElementById("ticket");
 const countEl = document.getElementById("count");
-const buttons = [...document.querySelectorAll(".finders button")];
+const buttons = [...document.querySelectorAll(".finders button, .extras button")];
 const fromBox = document.getElementById("from");
 const fromText = document.getElementById("fromText");
 const skipUnknown = document.getElementById("skipUnknown");
@@ -375,6 +388,12 @@ for (const box of [skipUnknown, takeawayOnly, showOther]) {
 function updateOther() {
   document.getElementById("nearPharmacy").hidden = !showOther.checked;
   document.getElementById("nearGrocery").hidden = !showOther.checked;
+  updateExtrasRow();
+}
+// Hide the whole extra row when none of its buttons are showing, so it leaves no gap.
+function updateExtrasRow() {
+  const row = document.querySelector(".extras");
+  row.hidden = [...row.children].every(b => b.hidden);
 }
 updateOther();
 function nounFor(kind) { return kind === "food" && takeawayOnly.checked ? "takeaway place" : KINDS[kind].noun; }
@@ -386,7 +405,7 @@ updateFoodLabels();
 let here = null;       // {lat, lon, label}
 let places = null;     // all places near `here`
 let placesRadius = 0;  // how far `places` reaches
-const lastPick = { bar: null, food: null, pharmacy: null, grocery: null };
+const lastPick = { bar: null, food: null, pharmacy: null, grocery: null, polet: null };
 
 function setState(msg, isErr) {
   ticket.className = "ticket";
@@ -478,7 +497,9 @@ function toPlaces(elements) {
     const t = el.tags || {};
     const addr = [ [t["addr:street"], t["addr:housenumber"]].filter(Boolean).join(" "), t["addr:city"] ].filter(Boolean).join(", ");
     const cuisine = (t.cuisine || "").split(";")[0].replace(/_/g, " ");
-    const kind = ALL_AMENITIES.includes(t.amenity) ? t.amenity : t.shop;
+    const kind = ALL_AMENITIES.includes(t.amenity) ? t.amenity
+      : t.shop === "alcohol" ? (/vinmonopolet/i.test((t.name || "") + " " + (t.brand || "")) ? "vinmonopolet" : "alcohol")
+      : t.shop;
     return { id: el.type + "/" + el.id, lat, lon, amenity: kind,
       name: t.name || "Unnamed " + (AMENITY_LABEL[t.amenity] || "place").toLowerCase(),
       cuisine, addr, hours: t.opening_hours || "", web: t.website || t["contact:website"] || "" };
@@ -508,7 +529,7 @@ function raceServers(q, ms = 40000) {
 // A cached area is reused whenever it was fetched with at least the radius needed now.
 async function fetchLive(pos, radius) {
   const gLat = Math.round(pos.lat * 1000) / 1000, gLon = Math.round(pos.lon * 1000) / 1000;
-  const key = "places3:" + gLat + "," + gLon;
+  const key = "places4:" + gLat + "," + gLon;
   let elements = null;
   try {
     const c = JSON.parse(localStorage.getItem(key) || "null");
@@ -527,7 +548,7 @@ async function fetchLive(pos, radius) {
    Fetched once in the background when the page opens, refreshed weekly.
    Searches inside this box then need no network at all. */
 const CITY = { name: "Oslo", s: 59.78, w: 10.40, n: 60.02, e: 11.00 };
-const CITY_KEY = "city:oslo:v2";   // v2 = also has pharmacies and groceries
+const CITY_KEY = "city:oslo:v3";   // v3 = also has Vinmonopolet and register stores
 const CITY_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const cityNote = document.getElementById("cityNote");
 let cityPlaces = null;   // array of places once ready
@@ -552,7 +573,7 @@ function downloadCity() {
   const q = `[out:json][timeout:180];` + placeQuery(`(${CITY.s},${CITY.w},${CITY.n},${CITY.e})`);
   return raceServers(q, 200000).then(elements => {
     const list = toPlaces(elements);
-    useCity({ v: 2, t: Date.now(), rows: list.map(pack) });
+    useCity({ v: 3, t: Date.now(), rows: list.map(pack) });
     return list;
   });
 }
@@ -563,15 +584,16 @@ async function fetchCityFile() {
   if (!res.ok) throw new Error("no city file");
   const data = await res.json();
   if (!data || !Array.isArray(data.rows) || !data.rows.length) throw new Error("bad city file");
-  if (!(data.v >= 2)) throw new Error("old city file without pharmacies and groceries");
+  if (!(data.v >= 3)) throw new Error("old city file without Vinmonopolet");
   return data;
 }
 
 function useCity(data) {
-  data = { v: 2, ...data };
+  data = { v: 3, ...data };
   try { localStorage.setItem(CITY_KEY, JSON.stringify(data)); } catch {}
   cityPlaces = data.rows.map(unpack);
   noteCity(data.t);
+  updatePolet();
   return cityPlaces;
 }
 
@@ -720,6 +742,7 @@ async function ensurePlaces(radius) {
   if (!places || placesRadius < radius) {
     setState(`Looking for places within ${fmtDist(radius)}…`);
     places = await fetchPlaces(here, radius);
+    updatePolet();
     placesRadius = radius;
   }
 }
@@ -780,6 +803,7 @@ document.getElementById("randFood").addEventListener("click", () => find("food",
 document.getElementById("nearFood").addEventListener("click", () => find("food", "closest"));
 document.getElementById("nearPharmacy").addEventListener("click", () => find("pharmacy", "closest"));
 document.getElementById("nearGrocery").addEventListener("click", () => find("grocery", "closest"));
+document.getElementById("nearPolet").addEventListener("click", () => find("polet", "closest"));
 
 document.getElementById("useLocation").addEventListener("click", async () => {
   const locBtn = document.getElementById("useLocation");
@@ -922,6 +946,27 @@ document.getElementById("manual").addEventListener("submit", async ev => {
   input.blur();   // close the phone keyboard
   await setFromText(text);
 });
+
+/* ---------- Polet button only while Vinmonopolet is open ----------
+   Uses the real opening hours of the Vinmonopolet stores in the data: the button shows while at
+   least one is open. Before any data has loaded it uses Vinmonopolet's usual hours. */
+function poletOpenNow(now) {
+  const src = (places && places.length ? places : cityPlaces) || [];
+  const known = src.filter(p => p.amenity === "vinmonopolet")
+    .map(p => hoursStatus(p.hours, now).state).filter(st => st !== "unknown");
+  if (known.length) return known.includes("open");
+  const day = now.getDay(), min = now.getHours() * 60 + now.getMinutes();
+  if (day === 0) return false;                          // Sunday: closed
+  if (day === 6) return min >= 9 * 60 && min < 18 * 60;  // Saturday
+  return min >= 10 * 60 && min < 20 * 60;               // weekdays
+}
+function updatePolet() {
+  document.getElementById("nearPolet").hidden = !poletOpenNow(new Date());
+  updateExtrasRow();
+}
+updatePolet();
+setInterval(updatePolet, 60 * 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) updatePolet(); });
 
 // Make it installable as an app (only works when served over https, e.g. GitHub Pages)
 if ("serviceWorker" in navigator && location.protocol === "https:") {
