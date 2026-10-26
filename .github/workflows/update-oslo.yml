@@ -144,6 +144,8 @@ jobs:
                           print("  register code", code, "skipped:", e)
                           break
                       found = (j.get("_embedded") or {}).get("underenheter") or []
+                      if page == 0:
+                          print(f"  register code {code}: {(j.get('page') or {}).get('totalElements', len(found))} entries")
                       for u in found:
                           units[u.get("organisasjonsnummer")] = u
                       total_pages = (j.get("page") or {}).get("totalPages", 0)
@@ -160,23 +162,42 @@ jobs:
           except Exception:
               geocache = {}
 
-          def geocode(street):
-              if street in geocache:
-                  return geocache[street]
+          def lookup(street):
+              """One Kartverket address search. Returns (street, [lat, lon] / None, failed?)."""
               params = urllib.parse.urlencode({"sok": street, "kommunenummer": "0301", "treffPerSide": 1, "utkoordsys": 4326})
-              hit = None
               try:
-                  j = get_json("https://ws.geonorge.no/adresser/v1/sok?" + params, timeout=30)
-                  a = (j.get("adresser") or [None])[0]
-                  p = (a or {}).get("representasjonspunkt") or {}
-                  if p.get("lat") is not None and p.get("lon") is not None:
-                      hit = [round(float(p["lat"]), 6), round(float(p["lon"]), 6)]
-              except Exception as e:
-                  print("  address lookup failed for", street, "-", e)
-                  return None                       # don't cache failures, try again next week
-              geocache[street] = hit
-              time.sleep(0.1)
-              return hit
+                  j = get_json("https://ws.geonorge.no/adresser/v1/sok?" + params, timeout=15)
+              except Exception:
+                  return street, None, True         # don't remember failures, try again next week
+              a = (j.get("adresser") or [None])[0]
+              p = (a or {}).get("representasjonspunkt") or {}
+              if p.get("lat") is not None and p.get("lon") is not None:
+                  return street, [round(float(p["lat"]), 6), round(float(p["lon"]), 6)], False
+              return street, None, False
+
+          def geocode_all(streets, budget_s):
+              """Look up new addresses 8 at a time. Stops after budget_s seconds so the job always
+              finishes and saves what it found; the rest are looked up next week."""
+              from concurrent.futures import ThreadPoolExecutor, as_completed
+              todo = sorted({st for st in streets if st not in geocache})
+              print(f"Kartverket: {len(streets) - len(todo)} addresses already known, {len(todo)} to look up")
+              start, done, failed = time.time(), 0, 0
+              with ThreadPoolExecutor(max_workers=8) as pool:
+                  futures = [pool.submit(lookup, st) for st in todo]
+                  for fut in as_completed(futures):
+                      st, hit, bad = fut.result()
+                      done += 1
+                      if bad:
+                          failed += 1
+                      else:
+                          geocache[st] = hit
+                      if done % 50 == 0 or done == len(todo):
+                          print(f"  looked up {done}/{len(todo)} addresses ({failed} failed)")
+                      if time.time() - start > budget_s:
+                          print("  time limit for this week reached; the rest will be looked up next week")
+                          for f2 in futures:
+                              f2.cancel()
+                          break
 
           added = 0
           try:
@@ -184,7 +205,31 @@ jobs:
               print("Register: got", len(units), "grocery/pharmacy locations in Oslo")
               osm = [(r[1], r[2], GROUP[r[3]], chain_of(r[4]), place_words(r[4]), norm_addr(r[6]))
                      for r in rows if r[3] in GROUP]
+              osm_addrs = {(o[2], o[5]) for o in osm if o[5]}
+
+              def wanted(u):
+                  """The register entry if it's an open grocery/pharmacy in Oslo, else None."""
+                  code = (u.get("naeringskode1") or {}).get("kode", "")
+                  if not (code.startswith("47.11") or code.startswith("47.73")):
+                      return None
+                  if u.get("nedleggelsesdato") or u.get("slettedato"):
+                      return None
+                  a = u.get("beliggenhetsadresse") or {}
+                  if a.get("kommunenummer") not in (None, "0301"):
+                      return None
+                  street = ((a.get("adresse") or [""])[0] or "").strip()
+                  if not street:
+                      return None
+                  group = "pharmacy" if code.startswith("47.73") else "grocery"
+                  if (group, norm_addr(street)) in osm_addrs:
+                      return None                   # same address already on OpenStreetMap: no lookup needed
+                  return street
+
+              geocode_all({st for st in map(wanted, units) if st}, budget_s=10 * 60)
+
               for u in units:
+                  if not wanted(u):
+                      continue
                   code = (u.get("naeringskode1") or {}).get("kode", "")
                   if not (code.startswith("47.11") or code.startswith("47.73")):
                       continue
@@ -196,7 +241,7 @@ jobs:
                   street = ((a.get("adresse") or [""])[0] or "").strip()
                   if not street:
                       continue
-                  pos = geocode(street)
+                  pos = geocache.get(street)
                   if not pos:
                       continue
                   lat, lon = pos
