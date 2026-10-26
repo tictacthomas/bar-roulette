@@ -114,6 +114,7 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
 .finders .closest { background: transparent; color: var(--ink); }
 .finders .closest.bar { border-color: var(--accent); }
 .finders .closest.food { border-color: var(--food); }
+.finders .closest.other { border-color: var(--muted); }
 .finders button:active { transform: scale(0.98); }
 .finders button:disabled { opacity: .6; cursor: progress; }
 
@@ -204,6 +205,8 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
     <button class="closest bar" id="nearBar" type="button">Closest bar<small>nearest open</small></button>
     <button class="random food" id="randFood" type="button">Random food<small class="foodKind">takeaway only</small></button>
     <button class="closest food" id="nearFood" type="button">Closest food<small class="foodKind">takeaway only</small></button>
+    <button class="closest other" id="nearPharmacy" type="button" hidden>Closest pharmacy<small>nearest open</small></button>
+    <button class="closest other" id="nearGrocery" type="button" hidden>Closest grocery<small>nearest open</small></button>
   </div>
 
   <div class="range">
@@ -235,6 +238,7 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid 
     <legend class="visually-hidden">Settings</legend>
     <label class="check"><input type="checkbox" id="takeawayOnly" checked> Food: takeaway only (no restaurants)</label>
     <label class="check"><input type="checkbox" id="skipUnknown" checked> Skip places that don't list opening hours</label>
+    <label class="check"><input type="checkbox" id="showOther"> Show pharmacy and grocery buttons</label>
   </fieldset>
 
   <div class="foot" hidden>
@@ -262,11 +266,17 @@ const randomRadius = () => +distInput.value;
 distInput.addEventListener("input", () => { distOut.textContent = fmtDist(randomRadius()); });
 distOut.textContent = fmtDist(randomRadius());
 const KINDS = {
-  bar:  { amenities: ["bar", "pub"], noun: "bar" },
-  food: { amenities: ["restaurant", "fast_food", "food_court"], noun: "place to eat" }
+  bar:      { amenities: ["bar", "pub"], noun: "bar" },
+  food:     { amenities: ["restaurant", "fast_food", "food_court"], noun: "place to eat" },
+  pharmacy: { amenities: ["pharmacy"], noun: "pharmacy" },
+  grocery:  { amenities: ["supermarket", "convenience"], noun: "grocery store" }
 };
-const ALL_AMENITIES = [...KINDS.bar.amenities, ...KINDS.food.amenities];
-const AMENITY_LABEL = { bar: "Bar", pub: "Pub", restaurant: "Restaurant", fast_food: "Takeaway", food_court: "Food court" };
+// what to ask the map for: these "amenity" values plus these "shop" values
+const ALL_AMENITIES = ["bar", "pub", "restaurant", "fast_food", "food_court", "pharmacy"];
+const ALL_SHOPS = ["supermarket", "convenience"];
+const placeQuery = area => `(nwr["amenity"~"^(${ALL_AMENITIES.join("|")})$"]${area};nwr["shop"~"^(${ALL_SHOPS.join("|")})$"]${area};);out center tags;`;
+const AMENITY_LABEL = { bar: "Bar", pub: "Pub", restaurant: "Restaurant", fast_food: "Takeaway", food_court: "Food court",
+  pharmacy: "Pharmacy", supermarket: "Supermarket", convenience: "Convenience store" };
 const ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
@@ -352,15 +362,21 @@ const fromBox = document.getElementById("from");
 const fromText = document.getElementById("fromText");
 const skipUnknown = document.getElementById("skipUnknown");
 const takeawayOnly = document.getElementById("takeawayOnly");
+const showOther = document.getElementById("showOther");
 const seen = new Set();   // places already shown by Random; lives only while the page is open
 // Remember the settings in this browser
-for (const box of [skipUnknown, takeawayOnly]) {
+for (const box of [skipUnknown, takeawayOnly, showOther]) {
   try { const v = localStorage.getItem("setting:" + box.id); if (v !== null) box.checked = v === "1"; } catch {}
   box.addEventListener("change", () => {
     try { localStorage.setItem("setting:" + box.id, box.checked ? "1" : "0"); } catch {}
-    updateFoodLabels();
+    updateFoodLabels(); updateOther();
   });
 }
+function updateOther() {
+  document.getElementById("nearPharmacy").hidden = !showOther.checked;
+  document.getElementById("nearGrocery").hidden = !showOther.checked;
+}
+updateOther();
 function nounFor(kind) { return kind === "food" && takeawayOnly.checked ? "takeaway place" : KINDS[kind].noun; }
 function foodAmenities() { return takeawayOnly.checked ? ["fast_food"] : KINDS.food.amenities; }
 function updateFoodLabels() {
@@ -370,7 +386,7 @@ updateFoodLabels();
 let here = null;       // {lat, lon, label}
 let places = null;     // all places near `here`
 let placesRadius = 0;  // how far `places` reaches
-const lastPick = { bar: null, food: null };
+const lastPick = { bar: null, food: null, pharmacy: null, grocery: null };
 
 function setState(msg, isErr) {
   ticket.className = "ticket";
@@ -462,7 +478,8 @@ function toPlaces(elements) {
     const t = el.tags || {};
     const addr = [ [t["addr:street"], t["addr:housenumber"]].filter(Boolean).join(" "), t["addr:city"] ].filter(Boolean).join(", ");
     const cuisine = (t.cuisine || "").split(";")[0].replace(/_/g, " ");
-    return { id: el.type + "/" + el.id, lat, lon, amenity: t.amenity,
+    const kind = ALL_AMENITIES.includes(t.amenity) ? t.amenity : t.shop;
+    return { id: el.type + "/" + el.id, lat, lon, amenity: kind,
       name: t.name || "Unnamed " + (AMENITY_LABEL[t.amenity] || "place").toLowerCase(),
       cuisine, addr, hours: t.opening_hours || "", web: t.website || t["contact:website"] || "" };
   }).filter(p => p.lat != null);
@@ -491,14 +508,14 @@ function raceServers(q, ms = 40000) {
 // A cached area is reused whenever it was fetched with at least the radius needed now.
 async function fetchLive(pos, radius) {
   const gLat = Math.round(pos.lat * 1000) / 1000, gLon = Math.round(pos.lon * 1000) / 1000;
-  const key = "places2:" + gLat + "," + gLon;
+  const key = "places3:" + gLat + "," + gLon;
   let elements = null;
   try {
     const c = JSON.parse(localStorage.getItem(key) || "null");
     if (c && Date.now() - c.t < CACHE_MS && c.r >= radius) elements = c.e;
   } catch {}
   if (!elements) {
-    const q = `[out:json][timeout:25];nwr["amenity"~"^(${ALL_AMENITIES.join("|")})$"](around:${radius + 120},${gLat},${gLon});out center tags;`;
+    const q = `[out:json][timeout:25];` + placeQuery(`(around:${radius + 120},${gLat},${gLon})`);
     try { elements = await raceServers(q); }
     catch (e) { throw new Error("None of the map servers answered. Try again in a minute. (Details: " + e.message + ")"); }
     try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), r: radius, e: elements })); } catch {}
@@ -510,7 +527,7 @@ async function fetchLive(pos, radius) {
    Fetched once in the background when the page opens, refreshed weekly.
    Searches inside this box then need no network at all. */
 const CITY = { name: "Oslo", s: 59.78, w: 10.40, n: 60.02, e: 11.00 };
-const CITY_KEY = "city:oslo:v1";
+const CITY_KEY = "city:oslo:v2";   // v2 = also has pharmacies and groceries
 const CITY_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const cityNote = document.getElementById("cityNote");
 let cityPlaces = null;   // array of places once ready
@@ -532,10 +549,10 @@ function noteCity(savedAt) {
 // Slow path: ask the map servers for all of Oslo (~30 s). Only used if the ready-made file isn't available.
 function downloadCity() {
   cityNote.textContent = `Saving ${CITY.name} for instant search…`;
-  const q = `[out:json][timeout:180];nwr["amenity"~"^(${ALL_AMENITIES.join("|")})$"](${CITY.s},${CITY.w},${CITY.n},${CITY.e});out center tags;`;
+  const q = `[out:json][timeout:180];` + placeQuery(`(${CITY.s},${CITY.w},${CITY.n},${CITY.e})`);
   return raceServers(q, 200000).then(elements => {
     const list = toPlaces(elements);
-    useCity({ t: Date.now(), rows: list.map(pack) });
+    useCity({ v: 2, t: Date.now(), rows: list.map(pack) });
     return list;
   });
 }
@@ -546,10 +563,12 @@ async function fetchCityFile() {
   if (!res.ok) throw new Error("no city file");
   const data = await res.json();
   if (!data || !Array.isArray(data.rows) || !data.rows.length) throw new Error("bad city file");
+  if (!(data.v >= 2)) throw new Error("old city file without pharmacies and groceries");
   return data;
 }
 
 function useCity(data) {
+  data = { v: 2, ...data };
   try { localStorage.setItem(CITY_KEY, JSON.stringify(data)); } catch {}
   cityPlaces = data.rows.map(unpack);
   noteCity(data.t);
@@ -712,7 +731,7 @@ async function find(kind, mode) {
     const limit = mode === "random" ? randomRadius() : CLOSEST_RADIUS;
     await ensurePlaces(limit);
     const now = new Date();
-    const all = places.filter(p => (kind === "food" ? foodAmenities() : KINDS.bar.amenities).includes(p.amenity) && p.dist <= limit)
+    const all = places.filter(p => (kind === "food" ? foodAmenities() : KINDS[kind].amenities).includes(p.amenity) && p.dist <= limit)
       .map(p => ({ p, st: hoursStatus(p.hours, now) }));
     const open = all.filter(x => x.st.state === "open");
     const unknown = !skipUnknown.checked ? all.filter(x => x.st.state === "unknown") : [];
@@ -759,6 +778,8 @@ document.getElementById("randBar").addEventListener("click", () => find("bar", "
 document.getElementById("nearBar").addEventListener("click", () => find("bar", "closest"));
 document.getElementById("randFood").addEventListener("click", () => find("food", "random"));
 document.getElementById("nearFood").addEventListener("click", () => find("food", "closest"));
+document.getElementById("nearPharmacy").addEventListener("click", () => find("pharmacy", "closest"));
+document.getElementById("nearGrocery").addEventListener("click", () => find("grocery", "closest"));
 
 document.getElementById("useLocation").addEventListener("click", async () => {
   const locBtn = document.getElementById("useLocation");
