@@ -1,6 +1,6 @@
 name: Update Oslo data
 
-# Rebuilds oslo.json (all bars, pubs, restaurants and takeaways in Oslo from OpenStreetMap)
+# Rebuilds oslo.json (bars, pubs, restaurants, takeaways, pharmacies and grocery stores in Oslo, from OpenStreetMap)
 # every Monday night, and whenever you press "Run workflow" on the Actions tab.
 on:
   schedule:
@@ -25,17 +25,20 @@ jobs:
           import json, time, urllib.parse, urllib.request
 
           S, W, N, E = 59.78, 10.40, 60.02, 11.00
-          AMENITIES = ["bar", "pub", "restaurant", "fast_food", "food_court"]
+          AMENITIES = ["bar", "pub", "restaurant", "fast_food", "food_court", "pharmacy"]
+          SHOPS = ["supermarket", "convenience"]
           LABEL = {"bar": "bar", "pub": "pub", "restaurant": "restaurant",
-                   "fast_food": "takeaway", "food_court": "food court"}
+                   "fast_food": "takeaway", "food_court": "food court", "pharmacy": "pharmacy",
+                   "supermarket": "supermarket", "convenience": "convenience store"}
           SERVERS = [
               "https://overpass-api.de/api/interpreter",
               "https://overpass.private.coffee/api/interpreter",
               "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
               "https://overpass.kumi.systems/api/interpreter",
           ]
-          q = ('[out:json][timeout:180];nwr["amenity"~"^(%s)$"](%s,%s,%s,%s);out center tags;'
-               % ("|".join(AMENITIES), S, W, N, E))
+          box = "(%s,%s,%s,%s)" % (S, W, N, E)
+          q = ('[out:json][timeout:180];(nwr["amenity"~"^(%s)$"]%s;nwr["shop"~"^(%s)$"]%s;);out center tags;'
+               % ("|".join(AMENITIES), box, "|".join(SHOPS), box))
           body = urllib.parse.urlencode({"data": q}).encode()
 
           data = None
@@ -67,16 +70,17 @@ jobs:
               if lat is None or lon is None:
                   continue
               t = el.get("tags", {})
+              kind = t["amenity"] if t.get("amenity") in AMENITIES else t.get("shop", "")
               street = " ".join(x for x in [t.get("addr:street"), t.get("addr:housenumber")] if x)
               addr = ", ".join(x for x in [street, t.get("addr:city")] if x)
               rows.append([
-                  f'{el["type"]}/{el["id"]}', round(lat, 6), round(lon, 6), t.get("amenity", ""),
-                  t.get("name") or "Unnamed " + LABEL.get(t.get("amenity"), "place"),
+                  f'{el["type"]}/{el["id"]}', round(lat, 6), round(lon, 6), kind,
+                  t.get("name") or "Unnamed " + LABEL.get(kind, "place"),
                   (t.get("cuisine") or "").split(";")[0].replace("_", " "),
                   addr, t.get("opening_hours", ""), t.get("website") or t.get("contact:website", ""),
               ])
 
-          out = {"t": int(time.time() * 1000), "rows": rows}
+          out = {"v": 2, "t": int(time.time() * 1000), "rows": rows}
           with open("oslo.json", "w", encoding="utf-8") as f:
               json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
           print("Wrote", len(rows), "places")
