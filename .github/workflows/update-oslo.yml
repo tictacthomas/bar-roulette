@@ -1,7 +1,9 @@
 name: Update Oslo data
 
-# Rebuilds oslo.json (bars, pubs, restaurants, takeaways, pharmacies and grocery stores in Oslo, from OpenStreetMap)
-# every Monday night, and whenever you press "Run workflow" on the Actions tab.
+# Rebuilds oslo.json every Monday night, and whenever you press "Run workflow" on the Actions tab:
+#  1. OpenStreetMap: bars, pubs, restaurants, takeaways, pharmacies, grocery stores and Vinmonopolet
+#  2. Brønnøysund Register + Kartverket: grocery stores and pharmacies that OpenStreetMap is missing
+#     (positions from Kartverket's address register, remembered in geocache.json)
 on:
   schedule:
     - cron: "17 3 * * 1"
@@ -13,23 +15,31 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download and trim Oslo places
+      - name: Download and combine Oslo places
         env:
           PYTHONUNBUFFERED: "1"
         run: |
           python3 - <<'PY'
-          import json, time, urllib.parse, urllib.request
+          import json, math, os, re, time, urllib.parse, urllib.request
 
+          UA = "bar-roulette-weekly-update (github actions)"
           S, W, N, E = 59.78, 10.40, 60.02, 11.00
+
+          def get_json(url, body=None, timeout=60):
+              req = urllib.request.Request(url, data=body, headers={"User-Agent": UA, "Accept": "application/json"})
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  return json.load(r)
+
+          # ---------- 1. OpenStreetMap ----------
           AMENITIES = ["bar", "pub", "restaurant", "fast_food", "food_court", "pharmacy"]
-          SHOPS = ["supermarket", "convenience"]
-          LABEL = {"bar": "bar", "pub": "pub", "restaurant": "restaurant",
-                   "fast_food": "takeaway", "food_court": "food court", "pharmacy": "pharmacy",
-                   "supermarket": "supermarket", "convenience": "convenience store"}
+          SHOPS = ["supermarket", "convenience", "alcohol"]
+          LABEL = {"bar": "bar", "pub": "pub", "restaurant": "restaurant", "fast_food": "takeaway",
+                   "food_court": "food court", "pharmacy": "pharmacy", "supermarket": "supermarket",
+                   "convenience": "convenience store", "vinmonopolet": "Vinmonopolet"}
           SERVERS = [
               "https://overpass-api.de/api/interpreter",
               "https://overpass.private.coffee/api/interpreter",
@@ -46,9 +56,7 @@ jobs:
               for url in SERVERS:
                   print("Trying", url, "...")
                   try:
-                      req = urllib.request.Request(url, data=body, headers={"User-Agent": "bar-roulette-weekly-update"})
-                      with urllib.request.urlopen(req, timeout=120) as r:
-                          j = json.load(r)
+                      j = get_json(url, body, timeout=120)
                       if j.get("remark") or not j.get("elements"):
                           raise RuntimeError(j.get("remark") or "empty result")
                       data = j
@@ -70,7 +78,14 @@ jobs:
               if lat is None or lon is None:
                   continue
               t = el.get("tags", {})
-              kind = t["amenity"] if t.get("amenity") in AMENITIES else t.get("shop", "")
+              if t.get("amenity") in AMENITIES:
+                  kind = t["amenity"]
+              elif t.get("shop") == "alcohol":
+                  if "vinmonopolet" not in (t.get("name", "") + " " + t.get("brand", "")).lower():
+                      continue                      # only Vinmonopolet, not other alcohol shops
+                  kind = "vinmonopolet"
+              else:
+                  kind = t.get("shop", "")
               street = " ".join(x for x in [t.get("addr:street"), t.get("addr:housenumber")] if x)
               addr = ", ".join(x for x in [street, t.get("addr:city")] if x)
               rows.append([
@@ -79,17 +94,152 @@ jobs:
                   (t.get("cuisine") or "").split(";")[0].replace("_", " "),
                   addr, t.get("opening_hours", ""), t.get("website") or t.get("contact:website", ""),
               ])
+          print("OpenStreetMap:", len(rows), "places,",
+                sum(r[3] == "vinmonopolet" for r in rows), "Vinmonopolet")
 
-          out = {"v": 2, "t": int(time.time() * 1000), "rows": rows}
+          # ---------- 2. Brønnøysund Register + Kartverket ----------
+          # Adds grocery stores and pharmacies that are registered in Oslo but missing from OpenStreetMap.
+          # Any failure here is logged and skipped, so the OpenStreetMap data is always saved.
+          GROUP = {"supermarket": "grocery", "convenience": "grocery", "pharmacy": "pharmacy"}
+          CHAINS = ["rema", "kiwi", "meny", "joker", "coop", "extra", "prix", "mega", "obs", "spar", "bunnpris",
+                    "7-eleven", "narvesen", "deli de luca", "vitusapotek", "apotek 1", "boots", "ditt apotek",
+                    "apotekfarmasi", "sykehusapotek"]
+          GENERIC = {"oslo", "as", "avd", "og", "i", "the", "senter", "apotek", "rema", "1000", "kiwi", "meny",
+                     "joker", "coop", "extra", "prix", "mega", "obs", "spar", "bunnpris", "narvesen", "eleven",
+                     "deli", "de", "luca", "vitusapotek", "boots", "ditt", "matbutikk", "dagligvare"}
+
+          def chain_of(name):
+              n = name.lower()
+              return next((c for c in CHAINS if c in n), None)
+
+          def place_words(name):
+              return {w for w in re.findall(r"[a-zæøåäöü0-9]+", name.lower()) if len(w) >= 3 and w not in GENERIC and not w.isdigit()}
+
+          def norm_addr(a):
+              return re.sub(r"\s+", " ", a.lower().split(",")[0].replace("gata", "gate").replace("gt.", "gate")).strip()
+
+          def metres(a_lat, a_lon, b_lat, b_lon):
+              x = math.radians(b_lon - a_lon) * math.cos(math.radians((a_lat + b_lat) / 2))
+              y = math.radians(b_lat - a_lat)
+              return 6371000 * math.hypot(x, y)
+
+          LEGAL = re.compile(r"\s+(AS|ASA|ANS|DA|SA|NUF|ENK|BA)\.?$", re.I)
+          def tidy(name):
+              n = LEGAL.sub("", name.strip()).title()
+              n = re.sub(r"(?<=\s)(Og|I|På|Ved|Avd)\b", lambda m: m.group(0).lower(), n)
+              return n
+
+          def register_units():
+              units = {}
+              # Ask for both the broad and the detailed codes: whichever the register accepts.
+              for code in ["47.11", "47.111", "47.112", "47.73", "47.730"]:
+                  page = 0
+                  while True:
+                      params = urllib.parse.urlencode({"kommunenummer": "0301", "naeringskode": code, "size": 500, "page": page})
+                      try:
+                          j = get_json("https://data.brreg.no/enhetsregisteret/api/underenheter?" + params)
+                      except Exception as e:
+                          print("  register code", code, "skipped:", e)
+                          break
+                      found = (j.get("_embedded") or {}).get("underenheter") or []
+                      for u in found:
+                          units[u.get("organisasjonsnummer")] = u
+                      total_pages = (j.get("page") or {}).get("totalPages", 0)
+                      page += 1
+                      if page >= total_pages or (page + 1) * 500 > 10000:
+                          break
+                      time.sleep(0.3)
+                  time.sleep(0.3)
+              return list(units.values())
+
+          cache_file = "geocache.json"
+          try:
+              geocache = json.load(open(cache_file, encoding="utf-8"))
+          except Exception:
+              geocache = {}
+
+          def geocode(street):
+              if street in geocache:
+                  return geocache[street]
+              params = urllib.parse.urlencode({"sok": street, "kommunenummer": "0301", "treffPerSide": 1, "utkoordsys": 4326})
+              hit = None
+              try:
+                  j = get_json("https://ws.geonorge.no/adresser/v1/sok?" + params, timeout=30)
+                  a = (j.get("adresser") or [None])[0]
+                  p = (a or {}).get("representasjonspunkt") or {}
+                  if p.get("lat") is not None and p.get("lon") is not None:
+                      hit = [round(float(p["lat"]), 6), round(float(p["lon"]), 6)]
+              except Exception as e:
+                  print("  address lookup failed for", street, "-", e)
+                  return None                       # don't cache failures, try again next week
+              geocache[street] = hit
+              time.sleep(0.1)
+              return hit
+
+          added = 0
+          try:
+              units = register_units()
+              print("Register: got", len(units), "grocery/pharmacy locations in Oslo")
+              osm = [(r[1], r[2], GROUP[r[3]], chain_of(r[4]), place_words(r[4]), norm_addr(r[6]))
+                     for r in rows if r[3] in GROUP]
+              for u in units:
+                  code = (u.get("naeringskode1") or {}).get("kode", "")
+                  if not (code.startswith("47.11") or code.startswith("47.73")):
+                      continue
+                  if u.get("nedleggelsesdato") or u.get("slettedato"):
+                      continue                      # closed down
+                  a = u.get("beliggenhetsadresse") or {}
+                  if a.get("kommunenummer") not in (None, "0301"):
+                      continue
+                  street = ((a.get("adresse") or [""])[0] or "").strip()
+                  if not street:
+                      continue
+                  pos = geocode(street)
+                  if not pos:
+                      continue
+                  lat, lon = pos
+                  if not (S <= lat <= N and W <= lon <= E):
+                      continue
+                  name = tidy(u.get("navn", ""))
+                  if code.startswith("47.73"):
+                      kind = "pharmacy"
+                  elif code.startswith("47.112") or re.search(r"7-eleven|narvesen|deli de luca|kiosk", name, re.I):
+                      kind = "convenience"
+                  else:
+                      kind = "supermarket"
+                  group, chain, words, addr = GROUP[kind], chain_of(name), place_words(name), norm_addr(street)
+                  duplicate = False
+                  for o_lat, o_lon, o_group, o_chain, o_words, o_addr in osm:
+                      if o_group != group:
+                          continue
+                      d = metres(lat, lon, o_lat, o_lon)
+                      if (d < 60 or (addr and addr == o_addr and d < 400)
+                              or (chain and chain == o_chain and d < 150)
+                              or (words & o_words and d < 300)):
+                          duplicate = True
+                          break
+                  if duplicate:
+                      continue
+                  rows.append([f'brreg/{u.get("organisasjonsnummer")}', lat, lon, kind, name, "",
+                               f"{street}, {(a.get('poststed') or 'Oslo').title()}", "", ""])
+                  added += 1
+              print("Register: added", added, "places that OpenStreetMap is missing")
+          except Exception as e:
+              print("Register step skipped:", e)
+
+          with open(cache_file, "w", encoding="utf-8") as f:
+              json.dump(geocache, f, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+          out = {"v": 3, "t": int(time.time() * 1000), "rows": rows}
           with open("oslo.json", "w", encoding="utf-8") as f:
               json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
-          print("Wrote", len(rows), "places")
+          print("Wrote", len(rows), "places in total")
           PY
 
       - name: Save to the repository
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add oslo.json
+          git add oslo.json geocache.json
           git commit -m "Update Oslo data" || echo "No changes"
           git push
