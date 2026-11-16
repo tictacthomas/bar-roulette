@@ -1,0 +1,16 @@
+{
+  "name": "Bar Roulette",
+  "short_name": "Bar Roulette",
+  "description": "A random bar or takeaway that's open right now, within walking distance.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3efe8",
+  "theme_color": "#b8336a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
