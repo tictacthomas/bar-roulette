@@ -396,7 +396,7 @@ async function connect(){
   if(room){
     try{const r=await room.join('mafia-'+me.code.toLowerCase());net=roomNet(r);sendNet();return}catch(e){}
   }
-  try{net=await peerNet()}catch(e){fail("This page couldn't open a live connection here. Everyone needs to be signed in to Claude and invited to the page, or host the page file on any website.")}
+  try{net=mixNet();lastSent='';sendNet()}catch(e){fail("This page couldn't open a live connection here. Check your internet connection and try again.")}
 }
 function roomNet(r){
   const n={send(){r.presence(me.host?{s:st,g:G}:{s:st,g:null}).catch(()=>{})}};
@@ -406,44 +406,213 @@ function roomNet(r){
   r.onConnection(setConn,()=>setConn(false));
   return n;
 }
-async function peerNet(){
-  if(!window.Peer)await loadScript('https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js');
-  const PO=window.MAFIA_PEER_OPTS||{};
-  const hid=()=>'mafia-night-cl-'+me.code.toLowerCase();
-  if(me.host){
-    const conns=new Set(),map={};let tries=0,p;
-    const start=()=>{
-      p=new Peer(hid(),PO);
-      p.on('open',()=>{tries=0;setConn(true)});
-      p.on('connection',c=>{
-        c.on('open',()=>{conns.add(c);c.send({g:G})});
-        c.on('data',d=>{if(d&&d.s&&d.s.i){c.pid=d.s.i;map[d.s.i]=d.s;onNet(map,null)}});
-        c.on('close',()=>{conns.delete(c);if(G&&G.ph==='lobby'&&c.pid){delete map[c.pid];onNet(map,null)}});
-      });
-      p.on('error',e=>{
-        if(e.type==='unavailable-id'){p.destroy();tries++;
-          if(tries>3&&G&&G.ph==='lobby'){me.code=newCode();G.code=me.code;saveMe();tries=0}
-          setTimeout(start,2500)}
-        else setConn(false)});
-      p.on('disconnected',()=>{setConn(false);setTimeout(()=>{try{p.reconnect()}catch(e){}},2000)});
-    };
-    start();
-    return{send(){conns.forEach(c=>{try{if(c.open)c.send({g:G})}catch(e){}})}};
+/* ---------- network: two relays + a direct link ----------
+   Every message goes three ways at once: through two public relay servers (MQTT over secure
+   WebSocket, which works on any Wi-Fi or mobile network, like loading a web page) and over a
+   direct PeerJS link when the networks allow one. Whichever copy arrives first counts; messages
+   are numbered, so the extra copies are ignored. */
+const RELAYS=window.MAFIA_RELAYS||['wss://broker.hivemq.com:8884/mqtt','wss://broker.emqx.io:8084/mqtt'];
+const te8=new TextEncoder(),td8=new TextDecoder();
+function cat(a){let n=0;for(const p of a)n+=p.length;const o=new Uint8Array(n);let k=0;for(const p of a){o.set(p,k);k+=p.length}return o}
+const u16=n=>new Uint8Array([n>>8&255,n&255]);
+const mstr=s=>{const b=te8.encode(s);return cat([u16(b.length),b])};
+const vlen=n=>{const o=[];do{let d=n%128;n=Math.floor(n/128);if(n>0)d|=128;o.push(d)}while(n>0);return new Uint8Array(o)};
+const mpkt=(h,b)=>cat([new Uint8Array([h]),vlen(b.length),b]);
+
+/* A small MQTT 3.1.1 client: connect, subscribe, publish (QoS 0, optionally retained),
+   a "last will" message, keep-alive, and reconnecting after sleep or network changes. */
+function miniMqtt(url,o){
+  let ws=null,buf=new Uint8Array(0),up=false,timer=null,retry=1500,pid=1,lastRx=0,closed=false;
+  const put=b=>{try{if(ws&&ws.readyState===1)ws.send(b)}catch(e){}};
+  const connectPkt=()=>mpkt(0x10,cat([mstr('MQTT'),new Uint8Array([4,2|(o.will?4|32:0)]),u16(30),mstr(o.id),
+    ...(o.will?[mstr(o.will),u16(0)]:[])]));
+  function onData(d){
+    lastRx=Date.now();
+    buf=cat([buf,new Uint8Array(d)]);
+    for(;;){
+      if(buf.length<2)return;
+      let i=1,v=0,m=1,b;
+      do{if(i>=buf.length)return;b=buf[i++];v+=(b&127)*m;m*=128}while(b&128);
+      if(buf.length<i+v)return;
+      const h=buf[0],body=buf.slice(i,i+v);buf=buf.slice(i+v);
+      const t=h>>4;
+      if(t===2){                                   // CONNACK
+        if(body[1]!==0){try{ws.close()}catch(e){}return}
+        up=true;retry=1500;
+        put(mpkt(0x82,cat([u16(pid++),...o.subs.map(s=>cat([mstr(s),new Uint8Array([0])]))])));
+        o.onUp();
+      }else if(t===3){                             // PUBLISH
+        const tl=body[0]<<8|body[1];let k=2+tl;if((h>>1)&3)k+=2;
+        o.onMsg(td8.decode(body.subarray(2,2+tl)),td8.decode(body.subarray(k)));
+      }
+    }
   }
-  const p=new Peer(PO);let c=null,rt=null;
-  const redial=()=>{clearTimeout(rt);rt=setTimeout(dial,2500)};
-  const dial=()=>{
-    if(p.disconnected){try{p.reconnect()}catch(e){}}
-    if(c){try{c.close()}catch(e){}}
-    const cc=c=p.connect(hid(),{reliable:true});
-    setTimeout(()=>{if(c===cc&&!cc.open){try{cc.close()}catch(e){}redial()}},6000);
-    cc.on('open',()=>{if(c!==cc)return;setConn(true);lastSent='';cc.send({s:st})});
-    cc.on('data',d=>{if(c===cc&&d&&d.g)onNet(null,d.g)});
-    cc.on('close',()=>{if(c!==cc)return;setConn(false);redial()});
-  };
-  p.on('open',dial);
-  p.on('error',e=>{setConn(false);if(e.type==='peer-unavailable'||e.type==='network'||e.type==='disconnected')redial()});
-  return{send(){try{if(c&&c.open)c.send({s:st})}catch(e){}}};
+  function later(){clearTimeout(timer);timer=setTimeout(open,retry);retry=Math.min(retry*2,15000)}
+  function open(){
+    clearTimeout(timer);if(closed)return;
+    let w;try{w=ws=new WebSocket(url,['mqtt'])}catch(e){ws=null;return later()}
+    w.binaryType='arraybuffer';buf=new Uint8Array(0);lastRx=Date.now();
+    w.onopen=()=>put(connectPkt());
+    w.onmessage=e=>{if(ws===w)onData(e.data)};
+    w.onerror=()=>{try{w.close()}catch(e){}};
+    w.onclose=()=>{if(ws!==w)return;ws=null;if(up){up=false;o.onDown()}later()};
+    setTimeout(()=>{if(ws===w&&!up)try{w.close()}catch(e){}},10000);   // no answer: try again
+  }
+  const iv=setInterval(()=>{                       // keep-alive; drop a connection that died while asleep
+    if(closed)return clearInterval(iv);
+    if(!ws)return;
+    if(Date.now()-lastRx>45000){try{ws.close()}catch(e){}return}
+    if(up)put(new Uint8Array([0xC0,0]));
+  },15000);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden||closed)return;
+    retry=1500;
+    if(!ws)open();
+    else if(up&&Date.now()-lastRx>25000){try{ws.close()}catch(e){}}
+  });
+  open();
+  return{up:()=>up,pub(t,s,ret){if(up)put(mpkt(0x30|(ret?1:0),cat([mstr(t),te8.encode(s)])))},
+    close(){closed=true;clearTimeout(timer);clearInterval(iv);const w=ws;ws=null;up=false;if(w)try{w.send(new Uint8Array([0xE0,0]));w.close()}catch(e){}}};
+}
+
+/* ---------- connection test ----------
+   For each relay: connect, send a message to ourselves through it and time the round trip.
+   For the direct link: check that PeerJS's introduction server answers. */
+const NET_NAMES=['Relay 1 (HiveMQ)','Relay 2 (EMQX)'];
+let netT=null;
+function relayTest(url){return new Promise(res=>{
+  const t0=performance.now(),topic='mafianight/v1/test/'+rid(10);let sent=0,done=false,c=null;
+  const fin=r=>{if(done)return;done=true;try{c&&c.close()}catch(e){}res(r)};
+  c=miniMqtt(url,{id:'mft'+rid(10),subs:[topic],will:null,
+    onUp(){sent=performance.now();c.pub(topic,'ping',false)},onDown(){},
+    onMsg(t,m){if(t===topic&&m==='ping')fin({ok:true,conn:sent-t0,rt:performance.now()-sent})}});
+  setTimeout(()=>fin({ok:false}),10000);
+})}
+function peerTest(){return new Promise(res=>{
+  if(!window.Peer)return res({ok:false});
+  const t0=performance.now();let p=null,done=false;
+  const fin=r=>{if(done)return;done=true;try{p&&p.destroy()}catch(e){}res(r)};
+  try{p=new Peer(window.MAFIA_PEER_OPTS||{})}catch(e){return fin({ok:false})}
+  p.on('open',()=>fin({ok:true,conn:performance.now()-t0}));p.on('error',()=>fin({ok:false}));
+  setTimeout(()=>fin({ok:false}),10000);
+})}
+async function runNetTest(){
+  if(netT&&netT.busy)return;
+  netT={busy:true,r:RELAYS.map(()=>null),p:null};render();
+  const jobs=RELAYS.map((u,k)=>relayTest(u).then(x=>{netT.r[k]=x;render()}));
+  jobs.push(peerTest().then(x=>{netT.p=x;render()}));
+  await Promise.all(jobs);netT.busy=false;render();
+}
+const secs=ms=>(ms/1000).toFixed(ms<1000?2:1)+' s';
+function netV(){
+  const t=netT||{busy:true,r:[],p:null};
+  const row=(name,x,okText)=>`<div class="row"><span><i class="dot ${x&&x.ok?'on':''}"></i>${name}</span><small class="${x&&!x.ok?'err':'mut'}" style="white-space:nowrap">${!x?'Testing…':x.ok?okText(x):'Not reachable'}</small></div>`;
+  const rows=RELAYS.map((u,k)=>row(NET_NAMES[k]||('Relay '+(k+1)),t.r[k],x=>`Works · ${secs(x.rt)}`)).join('')
+    +row('Direct link',t.p,x=>'Works');
+  const relOk=t.r.filter(x=>x&&x.ok).length;
+  let verdict='';
+  if(!t.busy){
+    verdict=relOk===RELAYS.length?`<p><b>Good to go.</b> This phone can reach both relays, so it can host or join a game.</p>`
+      :relOk>0?`<p><b>Good to go.</b> One relay is down or blocked here, but the other one works, and that's enough to play.</p>`
+      :t.p&&t.p.ok?`<p class="err">Neither relay works on this network.</p><p class="mut">The game can still try the direct link, but that often fails. Try switching this phone to mobile data, or another Wi-Fi.</p>`
+      :`<p class="err">This phone can't reach any of the game's servers.</p><p class="mut">Check that it's online. Some Wi-Fi networks (offices, schools, hotels) block them: try mobile data instead.</p>`;
+  }
+  return `<button class="link" data-a="home">← Back</button><h2>Connection test</h2>
+<p class="mut">Checks whether this phone can reach the servers the game uses. The time is how long a message takes to get through. If someone can't join, run it on their phone.</p>
+<div class="card">${rows}</div>${verdict}
+<button class="pri" data-a="nettest"${t.busy?' disabled':''}>${t.busy?'Testing…':'Test again'}</button>`;
+}
+
+function mixNet(){
+  const base='mafianight/v1/'+me.code.toLowerCase();
+  const myT=base+'/p/'+me.i;                      // player ids only use a-z and digits
+  const PO=window.MAFIA_PEER_OPTS||{};
+  const hid='mafia-night-cl-'+me.code.toLowerCase();
+  let Q=Date.now(),env=null,peerUp=false,gotG=false,pc=null;
+  const conns=new Set(),relays=[];
+  const last={},paths={};                         // newest message number, and which paths each player is on
+  const anyUp=()=>relays.some(r=>r.up())||peerUp;
+  const status=()=>setConn(me.host?anyUp():(anyUp()&&gotG));
+
+  function fromPlayer(src,d){
+    const s=d&&d.s;if(!s||!s.i)return;
+    (paths[s.i]=paths[s.i]||new Set()).add(src);
+    if(last[s.i]&&d.q<=last[s.i])return;
+    last[s.i]=d.q;
+    onNet(Object.assign({},players,{[s.i]:s}),null);
+  }
+  function gone(src,id){                          // a player is only gone once every path has lost them
+    const p=paths[id];if(!p)return;
+    p.delete(src);if(p.size)return;
+    delete last[id];
+    if(G&&G.ph==='lobby'&&players[id]){const m=Object.assign({},players);delete m[id];onNet(m,null)}
+  }
+  function fromHost(d){
+    if(!d||!d.g||(last.g&&d.q<=last.g))return;
+    last.g=d.q;gotG=true;onNet(null,d.g);status();
+  }
+
+  RELAYS.forEach((url,k)=>{
+    const src='r'+k;
+    const r=miniMqtt(url,{
+      id:'mf'+rid(12),
+      subs:[me.host?base+'/p/+':base+'/g'],
+      will:me.host?null:myT,                      // if this phone drops off, the relay tells the guide
+      onUp(){status();if(env)r.pub(me.host?base+'/g':myT,JSON.stringify(env),true)},
+      onDown(){status()},
+      onMsg(t,s){
+        if(me.host){
+          if(!s){gone(src,t.slice(t.lastIndexOf('/')+1));return}
+          try{fromPlayer(src,JSON.parse(s))}catch(e){}
+        }else if(s){try{fromHost(JSON.parse(s))}catch(e){}}
+      }
+    });
+    relays.push(r);
+  });
+
+  if(window.Peer)try{
+    if(me.host){
+      let p,wait=2500;
+      const start=()=>{
+        p=new Peer(hid,PO);
+        p.on('open',()=>{wait=2500;peerUp=true;status()});
+        p.on('connection',c=>{
+          c.on('open',()=>{conns.add(c);if(env)try{c.send(env)}catch(e){}});
+          c.on('data',d=>{if(d&&d.s&&d.s.i){c.pid=d.s.i;fromPlayer('p',d)}});
+          c.on('close',()=>{conns.delete(c);if(c.pid)gone('p',c.pid)});
+        });
+        p.on('error',e=>{
+          if(e.type==='unavailable-id'){peerUp=false;status();try{p.destroy()}catch(x){}
+            setTimeout(start,wait);wait=Math.min(wait*2,30000)}
+        });
+        p.on('disconnected',()=>{peerUp=false;status();setTimeout(()=>{try{p.reconnect()}catch(e){}},2000)});
+      };
+      start();
+    }else{
+      const p=new Peer(PO);let rt=null,wait=2500;
+      const redial=()=>{clearTimeout(rt);rt=setTimeout(dial,wait);wait=Math.min(wait*1.6,30000)};
+      const dial=()=>{
+        if(p.destroyed)return;
+        if(p.disconnected){try{p.reconnect()}catch(e){}}
+        if(pc){try{pc.close()}catch(e){}}
+        const cc=pc=p.connect(hid,{reliable:true});
+        setTimeout(()=>{if(pc===cc&&!cc.open){try{cc.close()}catch(e){}redial()}},8000);
+        cc.on('open',()=>{if(pc!==cc)return;wait=2500;peerUp=true;status();if(env)try{cc.send(env)}catch(e){}});
+        cc.on('data',d=>{if(pc===cc)fromHost(d)});
+        cc.on('close',()=>{if(pc!==cc)return;peerUp=false;status();redial()});
+      };
+      p.on('open',dial);
+      p.on('error',e=>{if(['peer-unavailable','network','disconnected','webrtc'].includes(e.type))redial()});
+    }
+  }catch(e){}
+
+  return{send(){
+    env=me.host?{q:++Q,g:G}:{q:++Q,s:st};
+    const t=me.host?base+'/g':myT,s=JSON.stringify(env);
+    relays.forEach(r=>r.pub(t,s,true));
+    if(me.host)conns.forEach(c=>{try{if(c.open)c.send(env)}catch(e){}});
+    else if(pc&&pc.open)try{pc.send(env)}catch(e){}
+  }};
 }
 
 /* ---------- views ---------- */
@@ -470,7 +639,7 @@ function rulesV(){
 function homeV(){
   return `<a class="homelink" href="./">← Home</a>`+hero()+`<h1>Mafia</h1><p class="mut">For one room full of people, each on their own phone. One player guides the game and plays too.</p>
 <button class="pri big" data-a="start">Start playing Mafia</button>
-<button class="link" data-a="hostnew">I'm the guide: host a new game</button><br><button class="link" data-a="practice">Practice mode: try every role alone</button><br><button class="link" data-a="hunterhome">Test the Hunter: get voted out and take your shot</button>${rulesV()}`;
+<button class="link" data-a="hostnew">I'm the guide: host a new game</button><br><button class="link" data-a="practice">Practice mode: try every role alone</button><br><button class="link" data-a="nettest">Test connection: can this phone reach the servers?</button><br><button class="link" data-a="hunterhome">Test the Hunter: get voted out and take your shot</button>${rulesV()}`;
 }
 function joinV(){
   const h=ui.mode==='host';
@@ -719,7 +888,7 @@ function gameV(){
 }
 function render(){
   document.body.className=G&&ui.scr==='game'&&['morning','day','hunter','dusk'].includes(G.ph)?'day':'';
-  const h=ui.scr==='home'?homeV():ui.scr==='join'?joinV():ui.scr==='practice'?practiceV():gameV();
+  const h=ui.scr==='home'?homeV():ui.scr==='join'?joinV():ui.scr==='practice'?practiceV():ui.scr==='nettest'?netV():gameV();
   if(h!==lastHtml){const y=window.scrollY;app.innerHTML=h;lastHtml=h;window.scrollTo(0,y)}
 }
 function toast(m){let t=document.querySelector('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t)}t.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),2600)}
@@ -747,6 +916,7 @@ app.addEventListener('click',e=>{
     case 'join':{const n=(ui.name||'').trim(),c=(ui.code||'').trim();if(!n){err='Enter your name.';break}if(c.length!==4){err='The game code has 4 letters.';break}
       me.n=n.slice(0,16);me.host=false;me.code=c;saveMe();G=null;enter();return}
     case 'practice':ui.scr='practice';err='';break;
+    case 'nettest':ui.scr='nettest';err='';runNetTest();return;
     case 'pbots':ui.bots=Math.max(3,Math.min(14,ui.bots+(+b.dataset.d)));break;
     case 'pmode':ui.pmode=r;break;
     case 'prole':ui.prole=r;break;
