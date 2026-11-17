@@ -63,7 +63,7 @@ label{font-weight:600;font-size:14px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--acc);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;z-index:9;max-width:90vw}
 .prog{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin:10px 0 4px}
 .prog i{display:block;height:100%;background:var(--ok);transition:width .4s}
-.code{font-family:Limelight,serif;font-size:52px;letter-spacing:.18em;color:var(--acc);line-height:1.1}
+.code{font-family:Inter,system-ui,sans-serif;font-weight:700;font-size:48px;letter-spacing:.14em;color:var(--acc);line-height:1.1}
 .win{text-align:center;padding:20px 8px}
 .win .disp{font-size:44px;color:var(--acc)}
 .tag{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--mut);font-style:normal;font-weight:600}
@@ -118,7 +118,10 @@ const MODES={std:["Standard","You set exactly which roles are in the game, and e
   sp:["Everyone special","Every player gets a power, no Peasants. The game deals a balanced mix and keeps the line-up and the Mafia count secret."]};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rid=(n=8)=>Array.from({length:n},()=>'abcdefghjkmnpqrstuvwxyz23456789'[Math.random()*31|0]).join('');
-const newCode=()=>Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0]).join('');
+// Game codes are real, easy four-letter words.
+const CODE_WORDS='ABLE APEX AQUA ARCH ARIA ATOM AUNT AURA BABY BACK BAKE BALL BAND BANK BARN BASE BATH BEAD BEAK BEAM BEAN BEAR BEEF BELL BELT BEND BIKE BIRD BLUE BOAT BODY BOLD BOLT BONE BOOK BOOT BOWL BULB BUNS BUSY BUZZ BYTE CAFE CAKE CALM CAMP CANE CAPE CARD CART CASE CASH CAVE CELL CHAT CHEF CHIN CHIP CITY CLAM CLAP CLAY CLIP CLUB COAL COAT CODE COIN COLD COMB CONE COOK COOL COPY CORD CORE CORN COZY CRAB CREW CROW CUBE CURL CUTE DARK DART DASH DATE DAWN DECK DEER DESK DIAL DICE DISH DIVE DOCK DOME DOOR DOVE DRUM DUCK DUNE DUSK DUST EASY EAST ECHO EDGE EPIC EXIT FACE FACT FAIR FARM FAST FERN FILM FIRE FISH FIVE FLAG FLAT FLIP FLOW FOAM FOLK FONT FOOD FOOT FORK FORT FOUR FROG FUEL FULL FUZZ GAME GATE GEAR GIFT GLAD GLOW GLUE GOAT GOLD GOLF GOOD GRAY GRIN GRIP GROW HAIR HALF HALL HALO HAND HARP HAWK HAZE HEAT HELM HERB HERO HIGH HIKE HILL HINT HIVE HOLD HOME HONK HOOD HOOK HOOP HOPE HORN HOST HOUR HUGE ICON IDEA INCH INKY IRIS IRON ISLE ITEM JADE JAZZ JEEP JOKE JOLT JULY JUMP JUNE KALE KEEN KELP KEYS KICK KIND KING KITE KIWI KNEE KNIT KNOB KNOT LACE LADY LAKE LAMB LAMP LAND LANE LARK LAVA LAWN LEAF LENS LIME LINE LINK LION LIST LOAF LOFT LOGO LOOP LOUD LUCK LUTE LYNX MAIL MAKE MANE MANY MAPS MARK MASK MAST MATH MAZE MEAL MELT MENU MILD MILK MILL MINT MIST MOAT MODE MOLE MOON MOSS MOTH MULE MUSE NAIL NAME NAVY NEAR NEAT NECK NEST NEWS NEXT NICE NOON NOSE NOTE NOVA OAKS OATS OBOE OKAY ONYX OPAL OPEN ORCA OVAL OVEN OWLS PACK PAGE PALM PARK PART PATH PEAK PEAR PEAS PINE PINK PIPE PLAN PLAY PLUM POEM POET POLE POND PONY POOL PORT POSE POUR PUFF PUMA PURE QUIZ RACE RAFT RAIN RAMP RANK RARE RAYS READ REEF REST RICE RICH RIDE RING RIPE RISE ROAD ROAM ROBE ROCK ROLL ROOF ROOM ROOT ROPE ROSE RUBY RUNE RUSH RUST SAFE SAGE SAIL SALT SAND SAVE SEAL SEED SHIP SHOE SHOP SIGN SILK SING SIZE SKIP SLED SLOW SNOW SOAP SOCK SOFA SOFT SOIL SOLO SONG SOUP SPIN STAR STEM STEP SUIT SURF SWAN SWIM TACO TAIL TALE TALL TAPE TART TASK TEAL TEAM TENT TIDE TIDY TILE TIME TINY TOAD TOFU TONE TOOL TOUR TOWN TREE TRIP TUBA TUNA TUNE TWIN TYPE UNIT VASE VAST VERB VEST VIEW VINE VOLT VOTE WADE WAKE WALK WALL WAND WARM WAVE WEEK WELL WEST WIND WING WINK WISE WISH WOLF WOOD WOOL WORD WORK WRAP YAKS YARD YARN YEAR YELL YOGA YOLK ZANY ZERO ZINC ZONE ZOOM'.split(' ');
+const newCode=()=>window.MAFIA_TEST_CODE||CODE_WORDS[Math.random()*CODE_WORDS.length|0];
+let freshGame=0;   // when this phone created a brand-new game (to clear leftovers of an old game with the same word)
 const ld=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
 const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const pick=a=>a[Math.random()*a.length|0];
@@ -376,6 +379,7 @@ function onNet(map,g){
 }
 function onGame(){
   if(!G)return;
+  if(!me.host&&!ui.practice&&G.kk&&G.kk.includes(me.i)&&me.code){try{sessionStorage.setItem('mf_kicked',G.code||me.code)}catch(e){}leave();return}
   if(!me.host&&G.hnow&&G.hnow!==lastH){lastH=G.hnow;off=G.hnow-Date.now()}
   if(G.rd!==lastRd){lastRd=G.rd;ui.ptOpen=false;ui.showRole=false;ui.comp=false;ui.t=ui.k=ui.v=null;ui.cf=null;ui.sw=[];ui.lv=[];ui.kill=false;ui.sure=''}
   if(G.gid){
@@ -411,7 +415,14 @@ function roomNet(r){
    WebSocket, which works on any Wi-Fi or mobile network, like loading a web page) and over a
    direct PeerJS link when the networks allow one. Whichever copy arrives first counts; messages
    are numbered, so the extra copies are ignored. */
-const RELAYS=window.MAFIA_RELAYS||['wss://broker.hivemq.com:8884/mqtt','wss://broker.emqx.io:8084/mqtt'];
+// Four free public relays run by four different organisations. The last two use the normal
+// web port (443), so they also get through strict Wi-Fi that blocks the first two.
+const RELAYS=(window.MAFIA_RELAYS||[
+  {name:'HiveMQ',url:'wss://broker.hivemq.com:8884/mqtt'},
+  {name:'EMQX',url:'wss://broker.emqx.io:8084/mqtt'},
+  {name:'Eclipse',url:'wss://mqtt.eclipseprojects.io/mqtt'},
+  {name:'shiftr.io',url:'wss://public.cloud.shiftr.io/',user:'public',pass:'public'}
+]).map(r=>typeof r==='string'?{url:r}:r);
 const te8=new TextEncoder(),td8=new TextDecoder();
 function cat(a){let n=0;for(const p of a)n+=p.length;const o=new Uint8Array(n);let k=0;for(const p of a){o.set(p,k);k+=p.length}return o}
 const u16=n=>new Uint8Array([n>>8&255,n&255]);
@@ -421,11 +432,14 @@ const mpkt=(h,b)=>cat([new Uint8Array([h]),vlen(b.length),b]);
 
 /* A small MQTT 3.1.1 client: connect, subscribe, publish (QoS 0, optionally retained),
    a "last will" message, keep-alive, and reconnecting after sleep or network changes. */
-function miniMqtt(url,o){
+function miniMqtt(relay,o){
+  const url=relay.url;
   let ws=null,buf=new Uint8Array(0),up=false,timer=null,retry=1500,pid=1,lastRx=0,closed=false;
   const put=b=>{try{if(ws&&ws.readyState===1)ws.send(b)}catch(e){}};
-  const connectPkt=()=>mpkt(0x10,cat([mstr('MQTT'),new Uint8Array([4,2|(o.will?4|32:0)]),u16(30),mstr(o.id),
-    ...(o.will?[mstr(o.will),u16(0)]:[])]));
+  const connectPkt=()=>mpkt(0x10,cat([mstr('MQTT'),
+    new Uint8Array([4,2|(o.will?4|32:0)|(relay.user!=null?128:0)|(relay.pass!=null?64:0)]),u16(30),mstr(o.id),
+    ...(o.will?[mstr(o.will),u16(0)]:[]),
+    ...(relay.user!=null?[mstr(relay.user)]:[]),...(relay.pass!=null?[mstr(relay.pass)]:[])]));
   function onData(d){
     lastRx=Date.now();
     buf=cat([buf,new Uint8Array(d)]);
@@ -443,7 +457,7 @@ function miniMqtt(url,o){
         o.onUp();
       }else if(t===3){                             // PUBLISH
         const tl=body[0]<<8|body[1];let k=2+tl;if((h>>1)&3)k+=2;
-        o.onMsg(td8.decode(body.subarray(2,2+tl)),td8.decode(body.subarray(k)));
+        o.onMsg(td8.decode(body.subarray(2,2+tl)),td8.decode(body.subarray(k)),(h&1)===1);
       }
     }
   }
@@ -478,12 +492,11 @@ function miniMqtt(url,o){
 /* ---------- connection test ----------
    For each relay: connect, send a message to ourselves through it and time the round trip.
    For the direct link: check that PeerJS's introduction server answers. */
-const NET_NAMES=['Relay 1 (HiveMQ)','Relay 2 (EMQX)'];
 let netT=null;
-function relayTest(url){return new Promise(res=>{
+function relayTest(relay){return new Promise(res=>{
   const t0=performance.now(),topic='mafianight/v1/test/'+rid(10);let sent=0,done=false,c=null;
   const fin=r=>{if(done)return;done=true;try{c&&c.close()}catch(e){}res(r)};
-  c=miniMqtt(url,{id:'mft'+rid(10),subs:[topic],will:null,
+  c=miniMqtt(relay,{id:'mft'+rid(10),subs:[topic],will:null,
     onUp(){sent=performance.now();c.pub(topic,'ping',false)},onDown(){},
     onMsg(t,m){if(t===topic&&m==='ping')fin({ok:true,conn:sent-t0,rt:performance.now()-sent})}});
   setTimeout(()=>fin({ok:false}),10000);
@@ -507,14 +520,14 @@ const secs=ms=>(ms/1000).toFixed(ms<1000?2:1)+' s';
 function netV(){
   const t=netT||{busy:true,r:[],p:null};
   const row=(name,x,okText)=>`<div class="row"><span><i class="dot ${x&&x.ok?'on':''}"></i>${name}</span><small class="${x&&!x.ok?'err':'mut'}" style="white-space:nowrap">${!x?'Testing…':x.ok?okText(x):'Not reachable'}</small></div>`;
-  const rows=RELAYS.map((u,k)=>row(NET_NAMES[k]||('Relay '+(k+1)),t.r[k],x=>`Works · ${secs(x.rt)}`)).join('')
+  const rows=RELAYS.map((u,k)=>row(`Relay ${k+1}${u.name?' ('+u.name+')':''}`,t.r[k],x=>`Works · ${secs(x.rt)}`)).join('')
     +row('Direct link',t.p,x=>'Works');
   const relOk=t.r.filter(x=>x&&x.ok).length;
   let verdict='';
   if(!t.busy){
-    verdict=relOk===RELAYS.length?`<p><b>Good to go.</b> This phone can reach both relays, so it can host or join a game.</p>`
-      :relOk>0?`<p><b>Good to go.</b> One relay is down or blocked here, but the other one works, and that's enough to play.</p>`
-      :t.p&&t.p.ok?`<p class="err">Neither relay works on this network.</p><p class="mut">The game can still try the direct link, but that often fails. Try switching this phone to mobile data, or another Wi-Fi.</p>`
+    verdict=relOk===RELAYS.length?`<p><b>Good to go.</b> This phone can reach all ${RELAYS.length} relays, so it can host or join a game.</p>`
+      :relOk>0?`<p><b>Good to go.</b> ${relOk} of ${RELAYS.length} relays work here. One is enough to play.</p>`
+      :t.p&&t.p.ok?`<p class="err">None of the relays work on this network.</p><p class="mut">The game can still try the direct link, but that often fails. Try switching this phone to mobile data, or another Wi-Fi.</p>`
       :`<p class="err">This phone can't reach any of the game's servers.</p><p class="mut">Check that it's online. Some Wi-Fi networks (offices, schools, hotels) block them: try mobile data instead.</p>`;
   }
   return `<button class="link" data-a="home">← Back</button><h2>Connection test</h2>
@@ -530,40 +543,57 @@ function mixNet(){
   const hid='mafia-night-cl-'+me.code.toLowerCase();
   let Q=Date.now(),env=null,peerUp=false,gotG=false,pc=null;
   const conns=new Set(),relays=[];
-  const last={},paths={};                         // newest message number, and which paths each player is on
+  const last={},seen={};                          // newest message number, and when each player was last heard from
   const anyUp=()=>relays.some(r=>r.up())||peerUp;
-  const status=()=>setConn(me.host?anyUp():(anyUp()&&gotG));
+  let upSince=0;
+  const status=()=>{const u=anyUp();if(u&&!upSince)upSince=Date.now();if(!u)upSince=0;setConn(me.host?u:(u&&gotG))};
 
-  function fromPlayer(src,d){
-    const s=d&&d.s;if(!s||!s.i)return;
-    (paths[s.i]=paths[s.i]||new Set()).add(src);
+  function fromPlayer(src,d,stored){
+    const s=d&&d.s;if(!s||!s.i||s.i===me.i)return;
+    if(G&&G.kk&&G.kk.includes(s.i))return;        // removed by the guide
+    const at=stored?(d.t||0):Date.now();          // a stored copy only tells us when it was sent
+    if(at>(seen[s.i]||0))seen[s.i]=at;
     if(last[s.i]&&d.q<=last[s.i])return;
     last[s.i]=d.q;
+    if(s.bye){if(G&&G.ph==='lobby'&&players[s.i])drop(s.i);return}   // they tapped Leave
     onNet(Object.assign({},players,{[s.i]:s}),null);
   }
-  function gone(src,id){                          // a player is only gone once every path has lost them
-    const p=paths[id];if(!p)return;
-    p.delete(src);if(p.size)return;
-    delete last[id];
-    if(G&&G.ph==='lobby'&&players[id]){const m=Object.assign({},players);delete m[id];onNet(m,null)}
+  function drop(id){const m=Object.assign({},players);delete m[id];delete seen[id];onNet(m,null)}
+
+  // Guide only: in the lobby, remove a player who hasn't been heard from for 15 minutes
+  // (phone asleep or page closed that long). Sleeping for less than that changes nothing.
+  if(me.host){
+    let tick=Date.now();
+    setInterval(()=>{
+      const now=Date.now();
+      if(now-tick>60e3)upSince=anyUp()?now:0;    // this phone was asleep itself: listen a while before judging
+      tick=now;
+      if(!G||G.ph!=='lobby'||!upSince||now-upSince<150e3)return;
+      for(const id in players){
+        if(id===me.i)continue;
+        if(now-(seen[id]||0)>15*60e3){delete last[id];drop(id)}
+      }
+    },30e3);
   }
   function fromHost(d){
     if(!d||!d.g||(last.g&&d.q<=last.g))return;
+    if(d.t&&Date.now()-d.t>6*3600e3)return;   // an old game left behind on a relay
     last.g=d.q;gotG=true;onNet(null,d.g);status();
   }
 
-  RELAYS.forEach((url,k)=>{
+  RELAYS.forEach((relay,k)=>{
     const src='r'+k;
-    const r=miniMqtt(url,{
+    const r=miniMqtt(relay,{
       id:'mf'+rid(12),
       subs:[me.host?base+'/p/+':base+'/g'],
-      will:me.host?null:myT,                      // if this phone drops off, the relay tells the guide
       onUp(){status();if(env)r.pub(me.host?base+'/g':myT,JSON.stringify(env),true)},
       onDown(){status()},
-      onMsg(t,s){
+      onMsg(t,s,stored){
         if(me.host){
-          if(!s){gone(src,t.slice(t.lastIndexOf('/')+1));return}
-          try{fromPlayer(src,JSON.parse(s))}catch(e){}
+          // A brand-new game: anything the relay had stored for this word belongs to an old game. Wipe it.
+          if(stored&&freshGame&&Date.now()-freshGame<5000){if(s)r.pub(t,'',true);return}
+          if(!s)return;
+          try{fromPlayer(src,JSON.parse(s),stored)}catch(e){}
         }else if(s){try{fromHost(JSON.parse(s))}catch(e){}}
       }
     });
@@ -579,7 +609,7 @@ function mixNet(){
         p.on('connection',c=>{
           c.on('open',()=>{conns.add(c);if(env)try{c.send(env)}catch(e){}});
           c.on('data',d=>{if(d&&d.s&&d.s.i){c.pid=d.s.i;fromPlayer('p',d)}});
-          c.on('close',()=>{conns.delete(c);if(c.pid)gone('p',c.pid)});
+          c.on('close',()=>conns.delete(c));
         });
         p.on('error',e=>{
           if(e.type==='unavailable-id'){peerUp=false;status();try{p.destroy()}catch(x){}
@@ -606,13 +636,20 @@ function mixNet(){
     }
   }catch(e){}
 
-  return{send(){
-    env=me.host?{q:++Q,g:G}:{q:++Q,s:st};
-    const t=me.host?base+'/g':myT,s=JSON.stringify(env);
+  function out(e){
+    const t=me.host?base+'/g':myT,s=JSON.stringify(e);
     relays.forEach(r=>r.pub(t,s,true));
-    if(me.host)conns.forEach(c=>{try{if(c.open)c.send(env)}catch(e){}});
-    else if(pc&&pc.open)try{pc.send(env)}catch(e){}
-  }};
+    if(me.host)conns.forEach(c=>{try{if(c.open)c.send(e)}catch(x){}});
+    else if(pc&&pc.open)try{pc.send(e)}catch(x){}
+  }
+  // "Still here": resend the latest message with a fresh time once a minute while the page is open.
+  // It stops when the phone sleeps, which is how the guide can tell how long someone has been away.
+  setInterval(()=>{if(env){env.t=Date.now();out(env)}},60e3);
+
+  return{
+    send(){env=me.host?{q:++Q,t:Date.now(),g:G}:{q:++Q,t:Date.now(),s:st};out(env)},
+    bye(){if(me.host)return;env=null;out({q:++Q,t:Date.now(),s:{i:me.i,bye:1}})}   // tapped Leave
+  };
 }
 
 /* ---------- views ---------- */
@@ -637,7 +674,7 @@ function rulesV(){
 <dl>${ORDER.concat('peasant').map(k=>`<dt>${R[k].n}</dt><dd>${R[k].d}</dd>`).join('')}</dl></details>`;
 }
 function homeV(){
-  return `<a class="homelink" href="./">← Home</a>`+hero()+`<h1>Mafia</h1><p class="mut">For one room full of people, each on their own phone. One player guides the game and plays too.</p>
+  return `<a class="homelink" href="./">← Home</a>`+hero()+`<h1>Mafia</h1>${ui.notice?`<p class="err">${esc(ui.notice)}</p>`:''}<p class="mut">For one room full of people, each on their own phone. One player guides the game and plays too.</p>
 <button class="pri big" data-a="start">Start playing Mafia</button>
 <button class="link" data-a="hostnew">I'm the guide: host a new game</button><br><button class="link" data-a="practice">Practice mode: try every role alone</button><br><button class="link" data-a="nettest">Test connection: can this phone reach the servers?</button><br><button class="link" data-a="hunterhome">Test the Hunter: get voted out and take your shot</button>${rulesV()}`;
 }
@@ -847,7 +884,7 @@ function settingsV(o,sv){
 }
 function lobbyV(){
   const n=G.lob.length,mode=G.mode||'std';
-  let h=`<h2>At the table</h2><p class="mut">${n} player${n===1?'':'s'} joined · ${MODES[mode][0]} mode</p>`+card(G.lob.map(p=>`<div class="row"><span>${esc(p.n)}${p.i===me.i?' <span class="tag">you</span>':''}</span></div>`).join('')||'<p class="mut">No one yet.</p>');
+  let h=`<h2>At the table</h2><p class="mut">${n} player${n===1?'':'s'} joined · ${MODES[mode][0]} mode</p>`+card(G.lob.map(p=>`<div class="row"><span>${esc(p.n)}${p.i===me.i?' <span class="tag">you</span>':''}</span>${me.host&&p.i!==me.i?`<button class="link" data-a="kick" data-p="${esc(p.i)}">${ui.sure==='kick:'+p.i?'Tap again to remove':'Remove'}</button>`:''}</div>`).join('')||'<p class="mut">No one yet.</p>');
   if(!me.host)return h+`<p class="mut">${MODES[mode][1]}</p><p class="mut">Waiting for the guide to deal the cards…</p>`+rulesV();
   h=`<div class="card guide"><p>Everyone opens this page, taps <b>Start playing</b> and enters this code:</p><div class="code">${esc(G.code)}</div></div>`+h;
   let c=`<p><b>Play style</b></p><div class="list">`+Object.keys(MODES).map(k=>`<button class="opt${k===mode?' sel':''}" data-a="mode" data-r="${k}"><span>${MODES[k][0]}</span><small>${k===mode?'Selected':''}</small></button>`).join('')+`</div><p class="mut">${MODES[mode][1]}</p>`;
@@ -893,8 +930,17 @@ function render(){
 }
 function toast(m){let t=document.querySelector('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t)}t.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),2600)}
 
+function kickPlayer(id){
+  if(!me.host||!G||G.ph!=='lobby'||id===me.i)return;
+  G.kk=(G.kk||[]).concat(id);
+  const m=Object.assign({},players);delete m[id];onNet(m,null);
+}
 function enter(){st={i:me.i,n:me.n};ui.scr='game';err='';lastSent='';render();connect()}
-function leave(){me.code='';me.host=false;saveMe();try{location.reload()}catch(e){}}
+function leave(){
+  const bye=net&&net.bye;if(bye)try{net.bye()}catch(e){}
+  me.code='';me.host=false;saveMe();
+  setTimeout(()=>{try{location.reload()}catch(e){}},bye?600:0);
+}
 
 /* ---------- events ---------- */
 app.addEventListener('input',e=>{if(e.target.id==='nm')ui.name=e.target.value;if(e.target.id==='cd')ui.code=e.target.value.toUpperCase().replace(/[^A-Z]/g,'')});
@@ -906,16 +952,19 @@ app.addEventListener('click',e=>{
   const a=b.dataset.a,p=b.dataset.p,r=b.dataset.r,k=b.dataset.k;
   const confirmTwice=key=>{if(!allDone()&&ui.sure!==key){ui.sure=key;render();return false}ui.sure='';return true};
   if(a!=='leave'&&ui.sure==='leave')ui.sure='';
+  if(a!=='kick'&&String(ui.sure).startsWith('kick:'))ui.sure='';
+  ui.notice='';
   switch(a){
     case 'start':ui.mode='join';ui.scr='join';err='';break;
     case 'hostnew':ui.mode='host';ui.scr='join';err='';break;
     case 'home':ui.scr='home';err='';break;
     case 'create':{const n=(ui.name||'').trim();if(!n){err='Enter your name.';break}
-      me.n=n.slice(0,16);me.host=true;me.code=newCode();saveMe();acts={};players={};
+      me.n=n.slice(0,16);me.host=true;me.code=newCode();freshGame=Date.now();saveMe();acts={};players={};
       G={ph:'lobby',code:me.code,setup:null,ng:20,rev:1,lob:[],rd:rid(),dn:0};enter();return}
     case 'join':{const n=(ui.name||'').trim(),c=(ui.code||'').trim();if(!n){err='Enter your name.';break}if(c.length!==4){err='The game code has 4 letters.';break}
       me.n=n.slice(0,16);me.host=false;me.code=c;saveMe();G=null;enter();return}
     case 'practice':ui.scr='practice';err='';break;
+    case 'kick':if(ui.sure!=='kick:'+p){ui.sure='kick:'+p;break}ui.sure='';kickPlayer(p);break;
     case 'nettest':ui.scr='nettest';err='';runNetTest();return;
     case 'pbots':ui.bots=Math.max(3,Math.min(14,ui.bots+(+b.dataset.d)));break;
     case 'pmode':ui.pmode=r;break;
@@ -995,7 +1044,10 @@ if(me.code&&me.n){
     const mine=acts[me.i];if(mine)st=Object.assign({},mine,{n:me.n})}
   const ss=ld('mf_st',null);if(ss&&ss.i===me.i)st=Object.assign({},ss,{n:me.n});
   ui.scr='game';lastRd=G?G.rd:'';onGame();render();connect();
-}else render();
+}else{
+  try{const k=sessionStorage.getItem('mf_kicked');if(k){sessionStorage.removeItem('mf_kicked');ui.notice=`The guide removed you from game ${k}.`}}catch(e){}
+  render();
+}
 }
 </script>
 </body>
