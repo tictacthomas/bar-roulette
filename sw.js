@@ -1,8 +1,8 @@
 // Bar Roulette service worker: lets the app open instantly and work without signal.
 // Always tries the network first so updates you upload show up right away,
 // and falls back to the saved copy when offline.
-const CACHE = "site-v2";
-const SHELL = ["./", "index.html", "bar.html", "mafia.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
+const CACHE = "site-v6";
+const SHELL = ["./", "index.html", "bar.html", "mafia.html", "games.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 
 self.addEventListener("install", ev => {
   ev.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

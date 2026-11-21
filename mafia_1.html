@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mafia Night</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Limelight&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: smoky speakeasy party game, playful but menacing
+   IDEA: a 1920s noir card table: each phone is a dealt card
+   PICTURE: moonlit city skyline over the title; the action list is the working picture in play
+   COLOUR and TYPE: wine-black night with blood red, sunrise peach by day; Limelight + Inter
+   LAYOUT: one phone column, guide controls in dashed cards below each player's own action */
+:root{--bg:#140a10;--ink:#f4e8e0;--mut:#bba5a8;--pan:#22131b;--line:#3d2632;--acc:#e3343e;--ok:#3cb8a4;color-scheme:dark}
+body.day{--bg:#f7dcc0;--ink:#2b141a;--mut:#7a5a55;--pan:#fff3e6;--line:#e6c09e;--acc:#c41f2b;--ok:#167a6b;color-scheme:light}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow-x:clip;transition:background .6s,color .6s;min-height:100vh}
+.wrap{max-width:540px;margin:0 auto;padding:12px 16px 110px;position:relative}
+.homelink{position:absolute;top:14px;left:16px;z-index:2;color:#f4e8e0;font:600 14px/1 Inter,sans-serif;text-decoration:none;background:rgba(20,10,16,.6);padding:9px 13px;border-radius:999px}
+.homelink:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.fab{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:auto;margin:0;z-index:8;border-radius:999px;padding:14px 20px;min-height:52px;background:var(--acc);border-color:var(--acc);color:#fff;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+h1,h2,.disp{font-family:Limelight,Georgia,serif;font-weight:400;line-height:1.05;text-wrap:balance;margin:0}
+h1{font-size:clamp(48px,14vw,68px);letter-spacing:.03em;margin-top:-8px}
+h2{font-size:32px;margin:4px 0 10px}
+p{margin:.45em 0}
+.mut{color:var(--mut);font-size:14px}
+.hero{position:relative;height:220px;margin:-12px -16px 0;overflow:hidden}
+.hero svg{position:absolute;inset:0;width:100%;height:100%}
+button{font:600 16px/1.2 Inter,sans-serif;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--pan);color:var(--ink);padding:12px 16px;cursor:pointer;width:100%;margin-top:8px}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+button.big{min-height:60px;font-size:19px}
+button:disabled{opacity:.4;cursor:default}
+button.link{background:none;border:none;color:var(--mut);text-decoration:underline;min-height:44px;width:auto;padding:8px 4px;margin:0}
+select{font:16px Inter,sans-serif;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--pan);color:var(--ink);padding:8px 10px;flex:1;min-width:0}
+.exrow{display:flex;align-items:center;gap:8px;margin-top:8px}
+.exrow button{width:auto;margin:0;padding:0 16px}
+input{font:16px Inter,sans-serif;width:100%;min-height:50px;border-radius:12px;border:1px solid var(--line);background:var(--pan);color:var(--ink);padding:12px 14px;margin:6px 0 14px}
+label{font-weight:600;font-size:14px}
+.bar{display:flex;align-items:center;gap:10px;justify-content:space-between;font-size:14px;color:var(--mut);padding:2px 0 8px;flex-wrap:wrap}
+.dot{width:9px;height:9px;border-radius:50%;background:#8a7a7c;display:inline-block;margin-right:6px}
+.dot.on{background:var(--ok)}
+.card{background:var(--pan);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+.role{border:2px solid var(--acc);text-align:center;padding:22px 16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.role .disp{font-size:40px;color:var(--acc);margin:4px 0 8px}
+.list{display:grid;gap:8px;margin:10px 0}
+.opt{display:flex;justify-content:space-between;align-items:center;text-align:left;margin:0;gap:10px}
+.wrow{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:12px;background:var(--pan);padding:6px 6px 6px 14px;font-weight:600}
+.wrow.pr{border-color:var(--ok)}.wrow.kl{border-color:var(--acc)}
+.wbtn{display:flex;gap:6px;flex-shrink:0}.wbtn button{width:auto;margin:0;min-height:44px;padding:8px 14px;font-size:15px}
+.wbtn button.on{background:var(--ok);border-color:var(--ok);color:#fff}.wbtn button.kill.on{background:var(--acc);border-color:var(--acc)}
+.opt.sel{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+.opt small{color:var(--mut);font-weight:400;white-space:nowrap}
+.dead{text-decoration:line-through;opacity:.55}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}
+.step{display:flex;align-items:center;gap:6px}
+.step button{width:44px;min-height:44px;padding:0;font-size:20px;margin:0}
+.step b{min-width:24px;padding:0 4px;text-align:center;white-space:nowrap}
+.guide{border-style:dashed;border-width:2px}
+.say{font-style:italic;font-size:17px}
+.pop{position:fixed;inset:0;z-index:20;background:rgba(10,4,8,.72);display:flex;align-items:center;justify-content:center;padding:20px}
+.pop .card{max-width:440px;width:100%;background:var(--pan)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--acc);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;z-index:9;max-width:90vw}
+.prog{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin:10px 0 4px}
+.prog i{display:block;height:100%;background:var(--ok);transition:width .4s}
+.code{font-family:Inter,system-ui,sans-serif;font-weight:700;font-size:48px;letter-spacing:.14em;color:var(--acc);line-height:1.1}
+.win{text-align:center;padding:20px 8px}
+.win .disp{font-size:44px;color:var(--acc)}
+.tag{display:inline-block;font-size:12px;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--mut);font-style:normal;font-weight:600}
+.err{color:var(--acc);font-weight:600}
+details{margin-top:22px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+dl{margin:0}dt{font-weight:700;margin-top:10px}dd{margin:0;color:var(--mut)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.list.pick{grid-template-columns:repeat(2,minmax(0,1fr))}
+.list.pick .opt{min-height:56px;padding:10px 12px;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px}
+.list.pick .opt small{white-space:normal}
+.list.pick .wrow{flex-direction:column;align-items:stretch;gap:6px;padding:10px}
+.list.pick .wbtn{flex-wrap:wrap}.list.pick .wbtn button{flex:1;padding:8px 6px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><h1>Mafia</h1><p>Loading…</p></div>
+<script>/* PeerJS 1.5.4, MIT licence, bundled so the game needs no outside script */
+(()=>{function e(e,t,n,r){Object.defineProperty(e,t,{get:n,set:r,enumerable:!0,configurable:!0})}function t(e){return e&&e.__esModule?e.default:e}class n{constructor(){this.chunkedMTU=16300,this._dataCount=1,this.chunk=e=>{let t=[],n=e.byteLength,r=Math.ceil(n/this.chunkedMTU),i=0,o=0;for(;o<n;){let s=Math.min(n,o+this.chunkedMTU),a=e.slice(o,s),c={__peerData:this._dataCount,n:i,data:a,total:r};t.push(c),o=s,i++}return this._dataCount++,t}}}class r{append_buffer(e){this.flush(),this._parts.push(e)}append(e){this._pieces.push(e)}flush(){if(this._pieces.length>0){let e=new Uint8Array(this._pieces);this._parts.push(e),this._pieces=[]}}toArrayBuffer(){let e=[];for(let t of this._parts)e.push(t);return function(e){let t=0;for(let n of e)t+=n.byteLength;let n=new Uint8Array(t),r=0;for(let t of e){let e=new Uint8Array(t.buffer,t.byteOffset,t.byteLength);n.set(e,r),r+=t.byteLength}return n}(e).buffer}constructor(){this.encoder=new TextEncoder,this._pieces=[],this._parts=[]}}function i(e){return new s(e).unpack()}function o(e){let t=new a,n=t.pack(e);return n instanceof Promise?n.then(()=>t.getBuffer()):t.getBuffer()}class s{unpack(){let e;let t=this.unpack_uint8();if(t<128)return t;if((224^t)<32)return(224^t)-32;if((e=160^t)<=15)return this.unpack_raw(e);if((e=176^t)<=15)return this.unpack_string(e);if((e=144^t)<=15)return this.unpack_array(e);if((e=128^t)<=15)return this.unpack_map(e);switch(t){case 192:return null;case 193:case 212:case 213:case 214:case 215:return;case 194:return!1;case 195:return!0;case 202:return this.unpack_float();case 203:return this.unpack_double();case 204:return this.unpack_uint8();case 205:return this.unpack_uint16();case 206:return this.unpack_uint32();case 207:return this.unpack_uint64();case 208:return this.unpack_int8();case 209:return this.unpack_int16();case 210:return this.unpack_int32();case 211:return this.unpack_int64();case 216:return e=this.unpack_uint16(),this.unpack_string(e);case 217:return e=this.unpack_uint32(),this.unpack_string(e);case 218:return e=this.unpack_uint16(),this.unpack_raw(e);case 219:return e=this.unpack_uint32(),this.unpack_raw(e);case 220:return e=this.unpack_uint16(),this.unpack_array(e);case 221:return e=this.unpack_uint32(),this.unpack_array(e);case 222:return e=this.unpack_uint16(),this.unpack_map(e);case 223:return e=this.unpack_uint32(),this.unpack_map(e)}}unpack_uint8(){let e=255&this.dataView[this.index];return this.index++,e}unpack_uint16(){let e=this.read(2),t=(255&e[0])*256+(255&e[1]);return this.index+=2,t}unpack_uint32(){let e=this.read(4),t=((256*e[0]+e[1])*256+e[2])*256+e[3];return this.index+=4,t}unpack_uint64(){let e=this.read(8),t=((((((256*e[0]+e[1])*256+e[2])*256+e[3])*256+e[4])*256+e[5])*256+e[6])*256+e[7];return this.index+=8,t}unpack_int8(){let e=this.unpack_uint8();return e<128?e:e-256}unpack_int16(){let e=this.unpack_uint16();return e<32768?e:e-65536}unpack_int32(){let e=this.unpack_uint32();return e<2147483648?e:e-4294967296}unpack_int64(){let e=this.unpack_uint64();return e<0x7fffffffffffffff?e:e-18446744073709552e3}unpack_raw(e){if(this.length<this.index+e)throw Error(`BinaryPackFailure: index is out of range ${this.index} ${e} ${this.length}`);let t=this.dataBuffer.slice(this.index,this.index+e);return this.index+=e,t}unpack_string(e){let t,n;let r=this.read(e),i=0,o="";for(;i<e;)(t=r[i])<160?(n=t,i++):(192^t)<32?(n=(31&t)<<6|63&r[i+1],i+=2):(224^t)<16?(n=(15&t)<<12|(63&r[i+1])<<6|63&r[i+2],i+=3):(n=(7&t)<<18|(63&r[i+1])<<12|(63&r[i+2])<<6|63&r[i+3],i+=4),o+=String.fromCodePoint(n);return this.index+=e,o}unpack_array(e){let t=Array(e);for(let n=0;n<e;n++)t[n]=this.unpack();return t}unpack_map(e){let t={};for(let n=0;n<e;n++)t[this.unpack()]=this.unpack();return t}unpack_float(){let e=this.unpack_uint32();return(0==e>>31?1:-1)*(8388607&e|8388608)*2**((e>>23&255)-127-23)}unpack_double(){let e=this.unpack_uint32(),t=this.unpack_uint32(),n=(e>>20&2047)-1023;return(0==e>>31?1:-1)*((1048575&e|1048576)*2**(n-20)+t*2**(n-52))}read(e){let t=this.index;if(t+e<=this.length)return this.dataView.subarray(t,t+e);throw Error("BinaryPackFailure: read index out of range")}constructor(e){this.index=0,this.dataBuffer=e,this.dataView=new Uint8Array(this.dataBuffer),this.length=this.dataBuffer.byteLength}}class a{getBuffer(){return this._bufferBuilder.toArrayBuffer()}pack(e){if("string"==typeof e)this.pack_string(e);else if("number"==typeof e)Math.floor(e)===e?this.pack_integer(e):this.pack_double(e);else if("boolean"==typeof e)!0===e?this._bufferBuilder.append(195):!1===e&&this._bufferBuilder.append(194);else if(void 0===e)this._bufferBuilder.append(192);else if("object"==typeof e){if(null===e)this._bufferBuilder.append(192);else{let t=e.constructor;if(e instanceof Array){let t=this.pack_array(e);if(t instanceof Promise)return t.then(()=>this._bufferBuilder.flush())}else if(e instanceof ArrayBuffer)this.pack_bin(new Uint8Array(e));else if("BYTES_PER_ELEMENT"in e)this.pack_bin(new Uint8Array(e.buffer,e.byteOffset,e.byteLength));else if(e instanceof Date)this.pack_string(e.toString());else if(e instanceof Blob)return e.arrayBuffer().then(e=>{this.pack_bin(new Uint8Array(e)),this._bufferBuilder.flush()});else if(t==Object||t.toString().startsWith("class")){let t=this.pack_object(e);if(t instanceof Promise)return t.then(()=>this._bufferBuilder.flush())}else throw Error(`Type "${t.toString()}" not yet supported`)}}else throw Error(`Type "${typeof e}" not yet supported`);this._bufferBuilder.flush()}pack_bin(e){let t=e.length;if(t<=15)this.pack_uint8(160+t);else if(t<=65535)this._bufferBuilder.append(218),this.pack_uint16(t);else if(t<=4294967295)this._bufferBuilder.append(219),this.pack_uint32(t);else throw Error("Invalid length");this._bufferBuilder.append_buffer(e)}pack_string(e){let t=this._textEncoder.encode(e),n=t.length;if(n<=15)this.pack_uint8(176+n);else if(n<=65535)this._bufferBuilder.append(216),this.pack_uint16(n);else if(n<=4294967295)this._bufferBuilder.append(217),this.pack_uint32(n);else throw Error("Invalid length");this._bufferBuilder.append_buffer(t)}pack_array(e){let t=e.length;if(t<=15)this.pack_uint8(144+t);else if(t<=65535)this._bufferBuilder.append(220),this.pack_uint16(t);else if(t<=4294967295)this._bufferBuilder.append(221),this.pack_uint32(t);else throw Error("Invalid length");let n=r=>{if(r<t){let t=this.pack(e[r]);return t instanceof Promise?t.then(()=>n(r+1)):n(r+1)}};return n(0)}pack_integer(e){if(e>=-32&&e<=127)this._bufferBuilder.append(255&e);else if(e>=0&&e<=255)this._bufferBuilder.append(204),this.pack_uint8(e);else if(e>=-128&&e<=127)this._bufferBuilder.append(208),this.pack_int8(e);else if(e>=0&&e<=65535)this._bufferBuilder.append(205),this.pack_uint16(e);else if(e>=-32768&&e<=32767)this._bufferBuilder.append(209),this.pack_int16(e);else if(e>=0&&e<=4294967295)this._bufferBuilder.append(206),this.pack_uint32(e);else if(e>=-2147483648&&e<=2147483647)this._bufferBuilder.append(210),this.pack_int32(e);else if(e>=-0x8000000000000000&&e<=0x7fffffffffffffff)this._bufferBuilder.append(211),this.pack_int64(e);else if(e>=0&&e<=18446744073709552e3)this._bufferBuilder.append(207),this.pack_uint64(e);else throw Error("Invalid integer")}pack_double(e){let t=0;e<0&&(t=1,e=-e);let n=Math.floor(Math.log(e)/Math.LN2),r=Math.floor((e/2**n-1)*4503599627370496),i=t<<31|n+1023<<20|r/4294967296&1048575;this._bufferBuilder.append(203),this.pack_int32(i),this.pack_int32(r%4294967296)}pack_object(e){let t=Object.keys(e),n=t.length;if(n<=15)this.pack_uint8(128+n);else if(n<=65535)this._bufferBuilder.append(222),this.pack_uint16(n);else if(n<=4294967295)this._bufferBuilder.append(223),this.pack_uint32(n);else throw Error("Invalid length");let r=n=>{if(n<t.length){let i=t[n];if(e.hasOwnProperty(i)){this.pack(i);let t=this.pack(e[i]);if(t instanceof Promise)return t.then(()=>r(n+1))}return r(n+1)}};return r(0)}pack_uint8(e){this._bufferBuilder.append(e)}pack_uint16(e){this._bufferBuilder.append(e>>8),this._bufferBuilder.append(255&e)}pack_uint32(e){let t=4294967295&e;this._bufferBuilder.append((4278190080&t)>>>24),this._bufferBuilder.append((16711680&t)>>>16),this._bufferBuilder.append((65280&t)>>>8),this._bufferBuilder.append(255&t)}pack_uint64(e){let t=e/4294967296,n=e%4294967296;this._bufferBuilder.append((4278190080&t)>>>24),this._bufferBuilder.append((16711680&t)>>>16),this._bufferBuilder.append((65280&t)>>>8),this._bufferBuilder.append(255&t),this._bufferBuilder.append((4278190080&n)>>>24),this._bufferBuilder.append((16711680&n)>>>16),this._bufferBuilder.append((65280&n)>>>8),this._bufferBuilder.append(255&n)}pack_int8(e){this._bufferBuilder.append(255&e)}pack_int16(e){this._bufferBuilder.append((65280&e)>>8),this._bufferBuilder.append(255&e)}pack_int32(e){this._bufferBuilder.append(e>>>24&255),this._bufferBuilder.append((16711680&e)>>>16),this._bufferBuilder.append((65280&e)>>>8),this._bufferBuilder.append(255&e)}pack_int64(e){let t=Math.floor(e/4294967296),n=e%4294967296;this._bufferBuilder.append((4278190080&t)>>>24),this._bufferBuilder.append((16711680&t)>>>16),this._bufferBuilder.append((65280&t)>>>8),this._bufferBuilder.append(255&t),this._bufferBuilder.append((4278190080&n)>>>24),this._bufferBuilder.append((16711680&n)>>>16),this._bufferBuilder.append((65280&n)>>>8),this._bufferBuilder.append(255&n)}constructor(){this._bufferBuilder=new r,this._textEncoder=new TextEncoder}}let c=!0,l=!0;function p(e,t,n){let r=e.match(t);return r&&r.length>=n&&parseInt(r[n],10)}function d(e,t,n){if(!e.RTCPeerConnection)return;let r=e.RTCPeerConnection.prototype,i=r.addEventListener;r.addEventListener=function(e,r){if(e!==t)return i.apply(this,arguments);let o=e=>{let t=n(e);t&&(r.handleEvent?r.handleEvent(t):r(t))};return this._eventMap=this._eventMap||{},this._eventMap[t]||(this._eventMap[t]=new Map),this._eventMap[t].set(r,o),i.apply(this,[e,o])};let o=r.removeEventListener;r.removeEventListener=function(e,n){if(e!==t||!this._eventMap||!this._eventMap[t]||!this._eventMap[t].has(n))return o.apply(this,arguments);let r=this._eventMap[t].get(n);return this._eventMap[t].delete(n),0===this._eventMap[t].size&&delete this._eventMap[t],0===Object.keys(this._eventMap).length&&delete this._eventMap,o.apply(this,[e,r])},Object.defineProperty(r,"on"+t,{get(){return this["_on"+t]},set(e){this["_on"+t]&&(this.removeEventListener(t,this["_on"+t]),delete this["_on"+t]),e&&this.addEventListener(t,this["_on"+t]=e)},enumerable:!0,configurable:!0})}function h(e){return"boolean"!=typeof e?Error("Argument type: "+typeof e+". Please use a boolean."):(c=e,e?"adapter.js logging disabled":"adapter.js logging enabled")}function u(e){return"boolean"!=typeof e?Error("Argument type: "+typeof e+". Please use a boolean."):(l=!e,"adapter.js deprecation warnings "+(e?"disabled":"enabled"))}function f(){"object"!=typeof window||c||"undefined"==typeof console||"function"!=typeof console.log||console.log.apply(console,arguments)}function m(e,t){l&&console.warn(e+" is deprecated, please use "+t+" instead.")}function g(e){return"[object Object]"===Object.prototype.toString.call(e)}function y(e,t,n){let r=n?"outbound-rtp":"inbound-rtp",i=new Map;if(null===t)return i;let o=[];return e.forEach(e=>{"track"===e.type&&e.trackIdentifier===t.id&&o.push(e)}),o.forEach(t=>{e.forEach(n=>{n.type===r&&n.trackId===t.id&&function e(t,n,r){!n||r.has(n.id)||(r.set(n.id,n),Object.keys(n).forEach(i=>{i.endsWith("Id")?e(t,t.get(n[i]),r):i.endsWith("Ids")&&n[i].forEach(n=>{e(t,t.get(n),r)})}))}(e,n,i)})}),i}var _,C,b,v,k,T,S,R,P,w,E,D,x,I,M,O,j={};function L(e,t){let n=e&&e.navigator;if(!n.mediaDevices)return;let r=function(e){if("object"!=typeof e||e.mandatory||e.optional)return e;let t={};return Object.keys(e).forEach(n=>{if("require"===n||"advanced"===n||"mediaSource"===n)return;let r="object"==typeof e[n]?e[n]:{ideal:e[n]};void 0!==r.exact&&"number"==typeof r.exact&&(r.min=r.max=r.exact);let i=function(e,t){return e?e+t.charAt(0).toUpperCase()+t.slice(1):"deviceId"===t?"sourceId":t};if(void 0!==r.ideal){t.optional=t.optional||[];let e={};"number"==typeof r.ideal?(e[i("min",n)]=r.ideal,t.optional.push(e),(e={})[i("max",n)]=r.ideal):e[i("",n)]=r.ideal,t.optional.push(e)}void 0!==r.exact&&"number"!=typeof r.exact?(t.mandatory=t.mandatory||{},t.mandatory[i("",n)]=r.exact):["min","max"].forEach(e=>{void 0!==r[e]&&(t.mandatory=t.mandatory||{},t.mandatory[i(e,n)]=r[e])})}),e.advanced&&(t.optional=(t.optional||[]).concat(e.advanced)),t},i=function(e,i){if(t.version>=61)return i(e);if((e=JSON.parse(JSON.stringify(e)))&&"object"==typeof e.audio){let t=function(e,t,n){t in e&&!(n in e)&&(e[n]=e[t],delete e[t])};t((e=JSON.parse(JSON.stringify(e))).audio,"autoGainControl","googAutoGainControl"),t(e.audio,"noiseSuppression","googNoiseSuppression"),e.audio=r(e.audio)}if(e&&"object"==typeof e.video){let o=e.video.facingMode;o=o&&("object"==typeof o?o:{ideal:o});let s=t.version<66;if(o&&("user"===o.exact||"environment"===o.exact||"user"===o.ideal||"environment"===o.ideal)&&!(n.mediaDevices.getSupportedConstraints&&n.mediaDevices.getSupportedConstraints().facingMode&&!s)){let t;if(delete e.video.facingMode,"environment"===o.exact||"environment"===o.ideal?t=["back","rear"]:("user"===o.exact||"user"===o.ideal)&&(t=["front"]),t)return n.mediaDevices.enumerateDevices().then(n=>{let s=(n=n.filter(e=>"videoinput"===e.kind)).find(e=>t.some(t=>e.label.toLowerCase().includes(t)));return!s&&n.length&&t.includes("back")&&(s=n[n.length-1]),s&&(e.video.deviceId=o.exact?{exact:s.deviceId}:{ideal:s.deviceId}),e.video=r(e.video),f("chrome: "+JSON.stringify(e)),i(e)})}e.video=r(e.video)}return f("chrome: "+JSON.stringify(e)),i(e)},o=function(e){return t.version>=64?e:{name:({PermissionDeniedError:"NotAllowedError",PermissionDismissedError:"NotAllowedError",InvalidStateError:"NotAllowedError",DevicesNotFoundError:"NotFoundError",ConstraintNotSatisfiedError:"OverconstrainedError",TrackStartError:"NotReadableError",MediaDeviceFailedDueToShutdown:"NotAllowedError",MediaDeviceKillSwitchOn:"NotAllowedError",TabCaptureError:"AbortError",ScreenCaptureError:"AbortError",DeviceCaptureError:"AbortError"})[e.name]||e.name,message:e.message,constraint:e.constraint||e.constraintName,toString(){return this.name+(this.message&&": ")+this.message}}};if(n.getUserMedia=(function(e,t,r){i(e,e=>{n.webkitGetUserMedia(e,t,e=>{r&&r(o(e))})})}).bind(n),n.mediaDevices.getUserMedia){let e=n.mediaDevices.getUserMedia.bind(n.mediaDevices);n.mediaDevices.getUserMedia=function(t){return i(t,t=>e(t).then(e=>{if(t.audio&&!e.getAudioTracks().length||t.video&&!e.getVideoTracks().length)throw e.getTracks().forEach(e=>{e.stop()}),new DOMException("","NotFoundError");return e},e=>Promise.reject(o(e))))}}}function A(e){e.MediaStream=e.MediaStream||e.webkitMediaStream}function B(e){if("object"!=typeof e||!e.RTCPeerConnection||"ontrack"in e.RTCPeerConnection.prototype)d(e,"track",e=>(e.transceiver||Object.defineProperty(e,"transceiver",{value:{receiver:e.receiver}}),e));else{Object.defineProperty(e.RTCPeerConnection.prototype,"ontrack",{get(){return this._ontrack},set(e){this._ontrack&&this.removeEventListener("track",this._ontrack),this.addEventListener("track",this._ontrack=e)},enumerable:!0,configurable:!0});let t=e.RTCPeerConnection.prototype.setRemoteDescription;e.RTCPeerConnection.prototype.setRemoteDescription=function(){return this._ontrackpoly||(this._ontrackpoly=t=>{t.stream.addEventListener("addtrack",n=>{let r;r=e.RTCPeerConnection.prototype.getReceivers?this.getReceivers().find(e=>e.track&&e.track.id===n.track.id):{track:n.track};let i=new Event("track");i.track=n.track,i.receiver=r,i.transceiver={receiver:r},i.streams=[t.stream],this.dispatchEvent(i)}),t.stream.getTracks().forEach(n=>{let r;r=e.RTCPeerConnection.prototype.getReceivers?this.getReceivers().find(e=>e.track&&e.track.id===n.id):{track:n};let i=new Event("track");i.track=n,i.receiver=r,i.transceiver={receiver:r},i.streams=[t.stream],this.dispatchEvent(i)})},this.addEventListener("addstream",this._ontrackpoly)),t.apply(this,arguments)}}}function F(e){if("object"==typeof e&&e.RTCPeerConnection&&!("getSenders"in e.RTCPeerConnection.prototype)&&"createDTMFSender"in e.RTCPeerConnection.prototype){let t=function(e,t){return{track:t,get dtmf(){return void 0===this._dtmf&&("audio"===t.kind?this._dtmf=e.createDTMFSender(t):this._dtmf=null),this._dtmf},_pc:e}};if(!e.RTCPeerConnection.prototype.getSenders){e.RTCPeerConnection.prototype.getSenders=function(){return this._senders=this._senders||[],this._senders.slice()};let n=e.RTCPeerConnection.prototype.addTrack;e.RTCPeerConnection.prototype.addTrack=function(e,r){let i=n.apply(this,arguments);return i||(i=t(this,e),this._senders.push(i)),i};let r=e.RTCPeerConnection.prototype.removeTrack;e.RTCPeerConnection.prototype.removeTrack=function(e){r.apply(this,arguments);let t=this._senders.indexOf(e);-1!==t&&this._senders.splice(t,1)}}let n=e.RTCPeerConnection.prototype.addStream;e.RTCPeerConnection.prototype.addStream=function(e){this._senders=this._senders||[],n.apply(this,[e]),e.getTracks().forEach(e=>{this._senders.push(t(this,e))})};let r=e.RTCPeerConnection.prototype.removeStream;e.RTCPeerConnection.prototype.removeStream=function(e){this._senders=this._senders||[],r.apply(this,[e]),e.getTracks().forEach(e=>{let t=this._senders.find(t=>t.track===e);t&&this._senders.splice(this._senders.indexOf(t),1)})}}else if("object"==typeof e&&e.RTCPeerConnection&&"getSenders"in e.RTCPeerConnection.prototype&&"createDTMFSender"in e.RTCPeerConnection.prototype&&e.RTCRtpSender&&!("dtmf"in e.RTCRtpSender.prototype)){let t=e.RTCPeerConnection.prototype.getSenders;e.RTCPeerConnection.prototype.getSenders=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e},Object.defineProperty(e.RTCRtpSender.prototype,"dtmf",{get(){return void 0===this._dtmf&&("audio"===this.track.kind?this._dtmf=this._pc.createDTMFSender(this.track):this._dtmf=null),this._dtmf}})}}function U(e){if(!("object"==typeof e&&e.RTCPeerConnection&&e.RTCRtpSender&&e.RTCRtpReceiver))return;if(!("getStats"in e.RTCRtpSender.prototype)){let t=e.RTCPeerConnection.prototype.getSenders;t&&(e.RTCPeerConnection.prototype.getSenders=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e});let n=e.RTCPeerConnection.prototype.addTrack;n&&(e.RTCPeerConnection.prototype.addTrack=function(){let e=n.apply(this,arguments);return e._pc=this,e}),e.RTCRtpSender.prototype.getStats=function(){let e=this;return this._pc.getStats().then(t=>y(t,e.track,!0))}}if(!("getStats"in e.RTCRtpReceiver.prototype)){let t=e.RTCPeerConnection.prototype.getReceivers;t&&(e.RTCPeerConnection.prototype.getReceivers=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e}),d(e,"track",e=>(e.receiver._pc=e.srcElement,e)),e.RTCRtpReceiver.prototype.getStats=function(){let e=this;return this._pc.getStats().then(t=>y(t,e.track,!1))}}if(!("getStats"in e.RTCRtpSender.prototype&&"getStats"in e.RTCRtpReceiver.prototype))return;let t=e.RTCPeerConnection.prototype.getStats;e.RTCPeerConnection.prototype.getStats=function(){if(arguments.length>0&&arguments[0]instanceof e.MediaStreamTrack){let e,t,n;let r=arguments[0];return(this.getSenders().forEach(t=>{t.track===r&&(e?n=!0:e=t)}),this.getReceivers().forEach(e=>(e.track===r&&(t?n=!0:t=e),e.track===r)),n||e&&t)?Promise.reject(new DOMException("There are more than one sender or receiver for the track.","InvalidAccessError")):e?e.getStats():t?t.getStats():Promise.reject(new DOMException("There is no sender or receiver for the track.","InvalidAccessError"))}return t.apply(this,arguments)}}function z(e){e.RTCPeerConnection.prototype.getLocalStreams=function(){return this._shimmedLocalStreams=this._shimmedLocalStreams||{},Object.keys(this._shimmedLocalStreams).map(e=>this._shimmedLocalStreams[e][0])};let t=e.RTCPeerConnection.prototype.addTrack;e.RTCPeerConnection.prototype.addTrack=function(e,n){if(!n)return t.apply(this,arguments);this._shimmedLocalStreams=this._shimmedLocalStreams||{};let r=t.apply(this,arguments);return this._shimmedLocalStreams[n.id]?-1===this._shimmedLocalStreams[n.id].indexOf(r)&&this._shimmedLocalStreams[n.id].push(r):this._shimmedLocalStreams[n.id]=[n,r],r};let n=e.RTCPeerConnection.prototype.addStream;e.RTCPeerConnection.prototype.addStream=function(e){this._shimmedLocalStreams=this._shimmedLocalStreams||{},e.getTracks().forEach(e=>{if(this.getSenders().find(t=>t.track===e))throw new DOMException("Track already exists.","InvalidAccessError")});let t=this.getSenders();n.apply(this,arguments);let r=this.getSenders().filter(e=>-1===t.indexOf(e));this._shimmedLocalStreams[e.id]=[e].concat(r)};let r=e.RTCPeerConnection.prototype.removeStream;e.RTCPeerConnection.prototype.removeStream=function(e){return this._shimmedLocalStreams=this._shimmedLocalStreams||{},delete this._shimmedLocalStreams[e.id],r.apply(this,arguments)};let i=e.RTCPeerConnection.prototype.removeTrack;e.RTCPeerConnection.prototype.removeTrack=function(e){return this._shimmedLocalStreams=this._shimmedLocalStreams||{},e&&Object.keys(this._shimmedLocalStreams).forEach(t=>{let n=this._shimmedLocalStreams[t].indexOf(e);-1!==n&&this._shimmedLocalStreams[t].splice(n,1),1===this._shimmedLocalStreams[t].length&&delete this._shimmedLocalStreams[t]}),i.apply(this,arguments)}}function N(e,t){if(!e.RTCPeerConnection)return;if(e.RTCPeerConnection.prototype.addTrack&&t.version>=65)return z(e);let n=e.RTCPeerConnection.prototype.getLocalStreams;e.RTCPeerConnection.prototype.getLocalStreams=function(){let e=n.apply(this);return this._reverseStreams=this._reverseStreams||{},e.map(e=>this._reverseStreams[e.id])};let r=e.RTCPeerConnection.prototype.addStream;e.RTCPeerConnection.prototype.addStream=function(t){if(this._streams=this._streams||{},this._reverseStreams=this._reverseStreams||{},t.getTracks().forEach(e=>{if(this.getSenders().find(t=>t.track===e))throw new DOMException("Track already exists.","InvalidAccessError")}),!this._reverseStreams[t.id]){let n=new e.MediaStream(t.getTracks());this._streams[t.id]=n,this._reverseStreams[n.id]=t,t=n}r.apply(this,[t])};let i=e.RTCPeerConnection.prototype.removeStream;function o(e,t){let n=t.sdp;return Object.keys(e._reverseStreams||[]).forEach(t=>{let r=e._reverseStreams[t],i=e._streams[r.id];n=n.replace(RegExp(i.id,"g"),r.id)}),new RTCSessionDescription({type:t.type,sdp:n})}e.RTCPeerConnection.prototype.removeStream=function(e){this._streams=this._streams||{},this._reverseStreams=this._reverseStreams||{},i.apply(this,[this._streams[e.id]||e]),delete this._reverseStreams[this._streams[e.id]?this._streams[e.id].id:e.id],delete this._streams[e.id]},e.RTCPeerConnection.prototype.addTrack=function(t,n){if("closed"===this.signalingState)throw new DOMException("The RTCPeerConnection's signalingState is 'closed'.","InvalidStateError");let r=[].slice.call(arguments,1);if(1!==r.length||!r[0].getTracks().find(e=>e===t))throw new DOMException("The adapter.js addTrack polyfill only supports a single  stream which is associated with the specified track.","NotSupportedError");if(this.getSenders().find(e=>e.track===t))throw new DOMException("Track already exists.","InvalidAccessError");this._streams=this._streams||{},this._reverseStreams=this._reverseStreams||{};let i=this._streams[n.id];if(i)i.addTrack(t),Promise.resolve().then(()=>{this.dispatchEvent(new Event("negotiationneeded"))});else{let r=new e.MediaStream([t]);this._streams[n.id]=r,this._reverseStreams[r.id]=n,this.addStream(r)}return this.getSenders().find(e=>e.track===t)},["createOffer","createAnswer"].forEach(function(t){let n=e.RTCPeerConnection.prototype[t];e.RTCPeerConnection.prototype[t]=({[t](){let e=arguments,t=arguments.length&&"function"==typeof arguments[0];return t?n.apply(this,[t=>{let n=o(this,t);e[0].apply(null,[n])},t=>{e[1]&&e[1].apply(null,t)},arguments[2]]):n.apply(this,arguments).then(e=>o(this,e))}})[t]});let s=e.RTCPeerConnection.prototype.setLocalDescription;e.RTCPeerConnection.prototype.setLocalDescription=function(){var e,t;let n;return arguments.length&&arguments[0].type&&(arguments[0]=(e=this,t=arguments[0],n=t.sdp,Object.keys(e._reverseStreams||[]).forEach(t=>{let r=e._reverseStreams[t],i=e._streams[r.id];n=n.replace(RegExp(r.id,"g"),i.id)}),new RTCSessionDescription({type:t.type,sdp:n}))),s.apply(this,arguments)};let a=Object.getOwnPropertyDescriptor(e.RTCPeerConnection.prototype,"localDescription");Object.defineProperty(e.RTCPeerConnection.prototype,"localDescription",{get(){let e=a.get.apply(this);return""===e.type?e:o(this,e)}}),e.RTCPeerConnection.prototype.removeTrack=function(e){let t;if("closed"===this.signalingState)throw new DOMException("The RTCPeerConnection's signalingState is 'closed'.","InvalidStateError");if(!e._pc)throw new DOMException("Argument 1 of RTCPeerConnection.removeTrack does not implement interface RTCRtpSender.","TypeError");if(e._pc!==this)throw new DOMException("Sender was not created by this connection.","InvalidAccessError");this._streams=this._streams||{},Object.keys(this._streams).forEach(n=>{this._streams[n].getTracks().find(t=>e.track===t)&&(t=this._streams[n])}),t&&(1===t.getTracks().length?this.removeStream(this._reverseStreams[t.id]):t.removeTrack(e.track),this.dispatchEvent(new Event("negotiationneeded")))}}function $(e,t){!e.RTCPeerConnection&&e.webkitRTCPeerConnection&&(e.RTCPeerConnection=e.webkitRTCPeerConnection),e.RTCPeerConnection&&t.version<53&&["setLocalDescription","setRemoteDescription","addIceCandidate"].forEach(function(t){let n=e.RTCPeerConnection.prototype[t];e.RTCPeerConnection.prototype[t]=({[t](){return arguments[0]=new("addIceCandidate"===t?e.RTCIceCandidate:e.RTCSessionDescription)(arguments[0]),n.apply(this,arguments)}})[t]})}function J(e,t){d(e,"negotiationneeded",e=>{let n=e.target;if(!(t.version<72)&&(!n.getConfiguration||"plan-b"!==n.getConfiguration().sdpSemantics)||"stable"===n.signalingState)return e})}e(j,"shimMediaStream",()=>A),e(j,"shimOnTrack",()=>B),e(j,"shimGetSendersWithDtmf",()=>F),e(j,"shimSenderReceiverGetStats",()=>U),e(j,"shimAddTrackRemoveTrackWithNative",()=>z),e(j,"shimAddTrackRemoveTrack",()=>N),e(j,"shimPeerConnection",()=>$),e(j,"fixNegotiationNeeded",()=>J),e(j,"shimGetUserMedia",()=>L);var V={};function G(e,t){let n=e&&e.navigator,r=e&&e.MediaStreamTrack;if(n.getUserMedia=function(e,t,r){m("navigator.getUserMedia","navigator.mediaDevices.getUserMedia"),n.mediaDevices.getUserMedia(e).then(t,r)},!(t.version>55&&"autoGainControl"in n.mediaDevices.getSupportedConstraints())){let e=function(e,t,n){t in e&&!(n in e)&&(e[n]=e[t],delete e[t])},t=n.mediaDevices.getUserMedia.bind(n.mediaDevices);if(n.mediaDevices.getUserMedia=function(n){return"object"==typeof n&&"object"==typeof n.audio&&(e((n=JSON.parse(JSON.stringify(n))).audio,"autoGainControl","mozAutoGainControl"),e(n.audio,"noiseSuppression","mozNoiseSuppression")),t(n)},r&&r.prototype.getSettings){let t=r.prototype.getSettings;r.prototype.getSettings=function(){let n=t.apply(this,arguments);return e(n,"mozAutoGainControl","autoGainControl"),e(n,"mozNoiseSuppression","noiseSuppression"),n}}if(r&&r.prototype.applyConstraints){let t=r.prototype.applyConstraints;r.prototype.applyConstraints=function(n){return"audio"===this.kind&&"object"==typeof n&&(e(n=JSON.parse(JSON.stringify(n)),"autoGainControl","mozAutoGainControl"),e(n,"noiseSuppression","mozNoiseSuppression")),t.apply(this,[n])}}}}function W(e,t){e.navigator.mediaDevices&&"getDisplayMedia"in e.navigator.mediaDevices||!e.navigator.mediaDevices||(e.navigator.mediaDevices.getDisplayMedia=function(n){if(!(n&&n.video)){let e=new DOMException("getDisplayMedia without video constraints is undefined");return e.name="NotFoundError",e.code=8,Promise.reject(e)}return!0===n.video?n.video={mediaSource:t}:n.video.mediaSource=t,e.navigator.mediaDevices.getUserMedia(n)})}function H(e){"object"==typeof e&&e.RTCTrackEvent&&"receiver"in e.RTCTrackEvent.prototype&&!("transceiver"in e.RTCTrackEvent.prototype)&&Object.defineProperty(e.RTCTrackEvent.prototype,"transceiver",{get(){return{receiver:this.receiver}}})}function Y(e,t){if("object"!=typeof e||!(e.RTCPeerConnection||e.mozRTCPeerConnection))return;!e.RTCPeerConnection&&e.mozRTCPeerConnection&&(e.RTCPeerConnection=e.mozRTCPeerConnection),t.version<53&&["setLocalDescription","setRemoteDescription","addIceCandidate"].forEach(function(t){let n=e.RTCPeerConnection.prototype[t];e.RTCPeerConnection.prototype[t]=({[t](){return arguments[0]=new("addIceCandidate"===t?e.RTCIceCandidate:e.RTCSessionDescription)(arguments[0]),n.apply(this,arguments)}})[t]});let n={inboundrtp:"inbound-rtp",outboundrtp:"outbound-rtp",candidatepair:"candidate-pair",localcandidate:"local-candidate",remotecandidate:"remote-candidate"},r=e.RTCPeerConnection.prototype.getStats;e.RTCPeerConnection.prototype.getStats=function(){let[e,i,o]=arguments;return r.apply(this,[e||null]).then(e=>{if(t.version<53&&!i)try{e.forEach(e=>{e.type=n[e.type]||e.type})}catch(t){if("TypeError"!==t.name)throw t;e.forEach((t,r)=>{e.set(r,Object.assign({},t,{type:n[t.type]||t.type}))})}return e}).then(i,o)}}function K(e){if(!("object"==typeof e&&e.RTCPeerConnection&&e.RTCRtpSender)||e.RTCRtpSender&&"getStats"in e.RTCRtpSender.prototype)return;let t=e.RTCPeerConnection.prototype.getSenders;t&&(e.RTCPeerConnection.prototype.getSenders=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e});let n=e.RTCPeerConnection.prototype.addTrack;n&&(e.RTCPeerConnection.prototype.addTrack=function(){let e=n.apply(this,arguments);return e._pc=this,e}),e.RTCRtpSender.prototype.getStats=function(){return this.track?this._pc.getStats(this.track):Promise.resolve(new Map)}}function X(e){if(!("object"==typeof e&&e.RTCPeerConnection&&e.RTCRtpSender)||e.RTCRtpSender&&"getStats"in e.RTCRtpReceiver.prototype)return;let t=e.RTCPeerConnection.prototype.getReceivers;t&&(e.RTCPeerConnection.prototype.getReceivers=function(){let e=t.apply(this,[]);return e.forEach(e=>e._pc=this),e}),d(e,"track",e=>(e.receiver._pc=e.srcElement,e)),e.RTCRtpReceiver.prototype.getStats=function(){return this._pc.getStats(this.track)}}function q(e){!e.RTCPeerConnection||"removeStream"in e.RTCPeerConnection.prototype||(e.RTCPeerConnection.prototype.removeStream=function(e){m("removeStream","removeTrack"),this.getSenders().forEach(t=>{t.track&&e.getTracks().includes(t.track)&&this.removeTrack(t)})})}function Q(e){e.DataChannel&&!e.RTCDataChannel&&(e.RTCDataChannel=e.DataChannel)}function Z(e){if(!("object"==typeof e&&e.RTCPeerConnection))return;let t=e.RTCPeerConnection.prototype.addTransceiver;t&&(e.RTCPeerConnection.prototype.addTransceiver=function(){this.setParametersPromises=[];let e=arguments[1]&&arguments[1].sendEncodings;void 0===e&&(e=[]);let n=(e=[...e]).length>0;n&&e.forEach(e=>{if("rid"in e&&!/^[a-z0-9]{0,16}$/i.test(e.rid))throw TypeError("Invalid RID value provided.");if("scaleResolutionDownBy"in e&&!(parseFloat(e.scaleResolutionDownBy)>=1))throw RangeError("scale_resolution_down_by must be >= 1.0");if("maxFramerate"in e&&!(parseFloat(e.maxFramerate)>=0))throw RangeError("max_framerate must be >= 0.0")});let r=t.apply(this,arguments);if(n){let{sender:t}=r,n=t.getParameters();"encodings"in n&&(1!==n.encodings.length||0!==Object.keys(n.encodings[0]).length)||(n.encodings=e,t.sendEncodings=e,this.setParametersPromises.push(t.setParameters(n).then(()=>{delete t.sendEncodings}).catch(()=>{delete t.sendEncodings})))}return r})}function ee(e){if(!("object"==typeof e&&e.RTCRtpSender))return;let t=e.RTCRtpSender.prototype.getParameters;t&&(e.RTCRtpSender.prototype.getParameters=function(){let e=t.apply(this,arguments);return"encodings"in e||(e.encodings=[].concat(this.sendEncodings||[{}])),e})}function et(e){if(!("object"==typeof e&&e.RTCPeerConnection))return;let t=e.RTCPeerConnection.prototype.createOffer;e.RTCPeerConnection.prototype.createOffer=function(){return this.setParametersPromises&&this.setParametersPromises.length?Promise.all(this.setParametersPromises).then(()=>t.apply(this,arguments)).finally(()=>{this.setParametersPromises=[]}):t.apply(this,arguments)}}function en(e){if(!("object"==typeof e&&e.RTCPeerConnection))return;let t=e.RTCPeerConnection.prototype.createAnswer;e.RTCPeerConnection.prototype.createAnswer=function(){return this.setParametersPromises&&this.setParametersPromises.length?Promise.all(this.setParametersPromises).then(()=>t.apply(this,arguments)).finally(()=>{this.setParametersPromises=[]}):t.apply(this,arguments)}}e(V,"shimOnTrack",()=>H),e(V,"shimPeerConnection",()=>Y),e(V,"shimSenderGetStats",()=>K),e(V,"shimReceiverGetStats",()=>X),e(V,"shimRemoveStream",()=>q),e(V,"shimRTCDataChannel",()=>Q),e(V,"shimAddTransceiver",()=>Z),e(V,"shimGetParameters",()=>ee),e(V,"shimCreateOffer",()=>et),e(V,"shimCreateAnswer",()=>en),e(V,"shimGetUserMedia",()=>G),e(V,"shimGetDisplayMedia",()=>W);var er={};function ei(e){if("object"==typeof e&&e.RTCPeerConnection){if("getLocalStreams"in e.RTCPeerConnection.prototype||(e.RTCPeerConnection.prototype.getLocalStreams=function(){return this._localStreams||(this._localStreams=[]),this._localStreams}),!("addStream"in e.RTCPeerConnection.prototype)){let t=e.RTCPeerConnection.prototype.addTrack;e.RTCPeerConnection.prototype.addStream=function(e){this._localStreams||(this._localStreams=[]),this._localStreams.includes(e)||this._localStreams.push(e),e.getAudioTracks().forEach(n=>t.call(this,n,e)),e.getVideoTracks().forEach(n=>t.call(this,n,e))},e.RTCPeerConnection.prototype.addTrack=function(e,...n){return n&&n.forEach(e=>{this._localStreams?this._localStreams.includes(e)||this._localStreams.push(e):this._localStreams=[e]}),t.apply(this,arguments)}}"removeStream"in e.RTCPeerConnection.prototype||(e.RTCPeerConnection.prototype.removeStream=function(e){this._localStreams||(this._localStreams=[]);let t=this._localStreams.indexOf(e);if(-1===t)return;this._localStreams.splice(t,1);let n=e.getTracks();this.getSenders().forEach(e=>{n.includes(e.track)&&this.removeTrack(e)})})}}function eo(e){if("object"==typeof e&&e.RTCPeerConnection&&("getRemoteStreams"in e.RTCPeerConnection.prototype||(e.RTCPeerConnection.prototype.getRemoteStreams=function(){return this._remoteStreams?this._remoteStreams:[]}),!("onaddstream"in e.RTCPeerConnection.prototype))){Object.defineProperty(e.RTCPeerConnection.prototype,"onaddstream",{get(){return this._onaddstream},set(e){this._onaddstream&&(this.removeEventListener("addstream",this._onaddstream),this.removeEventListener("track",this._onaddstreampoly)),this.addEventListener("addstream",this._onaddstream=e),this.addEventListener("track",this._onaddstreampoly=e=>{e.streams.forEach(e=>{if(this._remoteStreams||(this._remoteStreams=[]),this._remoteStreams.includes(e))return;this._remoteStreams.push(e);let t=new Event("addstream");t.stream=e,this.dispatchEvent(t)})})}});let t=e.RTCPeerConnection.prototype.setRemoteDescription;e.RTCPeerConnection.prototype.setRemoteDescription=function(){let e=this;return this._onaddstreampoly||this.addEventListener("track",this._onaddstreampoly=function(t){t.streams.forEach(t=>{if(e._remoteStreams||(e._remoteStreams=[]),e._remoteStreams.indexOf(t)>=0)return;e._remoteStreams.push(t);let n=new Event("addstream");n.stream=t,e.dispatchEvent(n)})}),t.apply(e,arguments)}}}function es(e){if("object"!=typeof e||!e.RTCPeerConnection)return;let t=e.RTCPeerConnection.prototype,n=t.createOffer,r=t.createAnswer,i=t.setLocalDescription,o=t.setRemoteDescription,s=t.addIceCandidate;t.createOffer=function(e,t){let r=arguments.length>=2?arguments[2]:arguments[0],i=n.apply(this,[r]);return t?(i.then(e,t),Promise.resolve()):i},t.createAnswer=function(e,t){let n=arguments.length>=2?arguments[2]:arguments[0],i=r.apply(this,[n]);return t?(i.then(e,t),Promise.resolve()):i};let a=function(e,t,n){let r=i.apply(this,[e]);return n?(r.then(t,n),Promise.resolve()):r};t.setLocalDescription=a,a=function(e,t,n){let r=o.apply(this,[e]);return n?(r.then(t,n),Promise.resolve()):r},t.setRemoteDescription=a,a=function(e,t,n){let r=s.apply(this,[e]);return n?(r.then(t,n),Promise.resolve()):r},t.addIceCandidate=a}function ea(e){let t=e&&e.navigator;if(t.mediaDevices&&t.mediaDevices.getUserMedia){let e=t.mediaDevices,n=e.getUserMedia.bind(e);t.mediaDevices.getUserMedia=e=>n(ec(e))}!t.getUserMedia&&t.mediaDevices&&t.mediaDevices.getUserMedia&&(t.getUserMedia=(function(e,n,r){t.mediaDevices.getUserMedia(e).then(n,r)}).bind(t))}function ec(e){return e&&void 0!==e.video?Object.assign({},e,{video:function e(t){return g(t)?Object.keys(t).reduce(function(n,r){let i=g(t[r]),o=i?e(t[r]):t[r],s=i&&!Object.keys(o).length;return void 0===o||s?n:Object.assign(n,{[r]:o})},{}):t}(e.video)}):e}function el(e){if(!e.RTCPeerConnection)return;let t=e.RTCPeerConnection;e.RTCPeerConnection=function(e,n){if(e&&e.iceServers){let t=[];for(let n=0;n<e.iceServers.length;n++){let r=e.iceServers[n];void 0===r.urls&&r.url?(m("RTCIceServer.url","RTCIceServer.urls"),(r=JSON.parse(JSON.stringify(r))).urls=r.url,delete r.url,t.push(r)):t.push(e.iceServers[n])}e.iceServers=t}return new t(e,n)},e.RTCPeerConnection.prototype=t.prototype,"generateCertificate"in t&&Object.defineProperty(e.RTCPeerConnection,"generateCertificate",{get:()=>t.generateCertificate})}function ep(e){"object"==typeof e&&e.RTCTrackEvent&&"receiver"in e.RTCTrackEvent.prototype&&!("transceiver"in e.RTCTrackEvent.prototype)&&Object.defineProperty(e.RTCTrackEvent.prototype,"transceiver",{get(){return{receiver:this.receiver}}})}function ed(e){let t=e.RTCPeerConnection.prototype.createOffer;e.RTCPeerConnection.prototype.createOffer=function(e){if(e){void 0!==e.offerToReceiveAudio&&(e.offerToReceiveAudio=!!e.offerToReceiveAudio);let t=this.getTransceivers().find(e=>"audio"===e.receiver.track.kind);!1===e.offerToReceiveAudio&&t?"sendrecv"===t.direction?t.setDirection?t.setDirection("sendonly"):t.direction="sendonly":"recvonly"===t.direction&&(t.setDirection?t.setDirection("inactive"):t.direction="inactive"):!0!==e.offerToReceiveAudio||t||this.addTransceiver("audio",{direction:"recvonly"}),void 0!==e.offerToReceiveVideo&&(e.offerToReceiveVideo=!!e.offerToReceiveVideo);let n=this.getTransceivers().find(e=>"video"===e.receiver.track.kind);!1===e.offerToReceiveVideo&&n?"sendrecv"===n.direction?n.setDirection?n.setDirection("sendonly"):n.direction="sendonly":"recvonly"===n.direction&&(n.setDirection?n.setDirection("inactive"):n.direction="inactive"):!0!==e.offerToReceiveVideo||n||this.addTransceiver("video",{direction:"recvonly"})}return t.apply(this,arguments)}}function eh(e){"object"!=typeof e||e.AudioContext||(e.AudioContext=e.webkitAudioContext)}e(er,"shimLocalStreamsAPI",()=>ei),e(er,"shimRemoteStreamsAPI",()=>eo),e(er,"shimCallbacksAPI",()=>es),e(er,"shimGetUserMedia",()=>ea),e(er,"shimConstraints",()=>ec),e(er,"shimRTCIceServerUrls",()=>el),e(er,"shimTrackEventTransceiver",()=>ep),e(er,"shimCreateOfferLegacy",()=>ed),e(er,"shimAudioContext",()=>eh);var eu={};e(eu,"shimRTCIceCandidate",()=>eg),e(eu,"shimRTCIceCandidateRelayProtocol",()=>ey),e(eu,"shimMaxMessageSize",()=>e_),e(eu,"shimSendThrowTypeError",()=>eC),e(eu,"shimConnectionState",()=>eb),e(eu,"removeExtmapAllowMixed",()=>ev),e(eu,"shimAddIceCandidateNullOrEmpty",()=>ek),e(eu,"shimParameterlessSetLocalDescription",()=>eT);var ef={};let em={};function eg(e){if(!e.RTCIceCandidate||e.RTCIceCandidate&&"foundation"in e.RTCIceCandidate.prototype)return;let n=e.RTCIceCandidate;e.RTCIceCandidate=function(e){if("object"==typeof e&&e.candidate&&0===e.candidate.indexOf("a=")&&((e=JSON.parse(JSON.stringify(e))).candidate=e.candidate.substring(2)),e.candidate&&e.candidate.length){let r=new n(e),i=t(ef).parseCandidate(e.candidate);for(let e in i)e in r||Object.defineProperty(r,e,{value:i[e]});return r.toJSON=function(){return{candidate:r.candidate,sdpMid:r.sdpMid,sdpMLineIndex:r.sdpMLineIndex,usernameFragment:r.usernameFragment}},r}return new n(e)},e.RTCIceCandidate.prototype=n.prototype,d(e,"icecandidate",t=>(t.candidate&&Object.defineProperty(t,"candidate",{value:new e.RTCIceCandidate(t.candidate),writable:"false"}),t))}function ey(e){!e.RTCIceCandidate||e.RTCIceCandidate&&"relayProtocol"in e.RTCIceCandidate.prototype||d(e,"icecandidate",e=>{if(e.candidate){let n=t(ef).parseCandidate(e.candidate.candidate);"relay"===n.type&&(e.candidate.relayProtocol=({0:"tls",1:"tcp",2:"udp"})[n.priority>>24])}return e})}function e_(e,n){if(!e.RTCPeerConnection)return;"sctp"in e.RTCPeerConnection.prototype||Object.defineProperty(e.RTCPeerConnection.prototype,"sctp",{get(){return void 0===this._sctp?null:this._sctp}});let r=function(e){if(!e||!e.sdp)return!1;let n=t(ef).splitSections(e.sdp);return n.shift(),n.some(e=>{let n=t(ef).parseMLine(e);return n&&"application"===n.kind&&-1!==n.protocol.indexOf("SCTP")})},i=function(e){let t=e.sdp.match(/mozilla...THIS_IS_SDPARTA-(\d+)/);if(null===t||t.length<2)return -1;let n=parseInt(t[1],10);return n!=n?-1:n},o=function(e){let t=65536;return"firefox"===n.browser&&(t=n.version<57?-1===e?16384:2147483637:n.version<60?57===n.version?65535:65536:2147483637),t},s=function(e,r){let i=65536;"firefox"===n.browser&&57===n.version&&(i=65535);let o=t(ef).matchPrefix(e.sdp,"a=max-message-size:");return o.length>0?i=parseInt(o[0].substring(19),10):"firefox"===n.browser&&-1!==r&&(i=2147483637),i},a=e.RTCPeerConnection.prototype.setRemoteDescription;e.RTCPeerConnection.prototype.setRemoteDescription=function(){if(this._sctp=null,"chrome"===n.browser&&n.version>=76){let{sdpSemantics:e}=this.getConfiguration();"plan-b"===e&&Object.defineProperty(this,"sctp",{get(){return void 0===this._sctp?null:this._sctp},enumerable:!0,configurable:!0})}if(r(arguments[0])){let e;let t=i(arguments[0]),n=o(t),r=s(arguments[0],t);e=0===n&&0===r?Number.POSITIVE_INFINITY:0===n||0===r?Math.max(n,r):Math.min(n,r);let a={};Object.defineProperty(a,"maxMessageSize",{get:()=>e}),this._sctp=a}return a.apply(this,arguments)}}function eC(e){if(!(e.RTCPeerConnection&&"createDataChannel"in e.RTCPeerConnection.prototype))return;function t(e,t){let n=e.send;e.send=function(){let r=arguments[0],i=r.length||r.size||r.byteLength;if("open"===e.readyState&&t.sctp&&i>t.sctp.maxMessageSize)throw TypeError("Message too large (can send a maximum of "+t.sctp.maxMessageSize+" bytes)");return n.apply(e,arguments)}}let n=e.RTCPeerConnection.prototype.createDataChannel;e.RTCPeerConnection.prototype.createDataChannel=function(){let e=n.apply(this,arguments);return t(e,this),e},d(e,"datachannel",e=>(t(e.channel,e.target),e))}function eb(e){if(!e.RTCPeerConnection||"connectionState"in e.RTCPeerConnection.prototype)return;let t=e.RTCPeerConnection.prototype;Object.defineProperty(t,"connectionState",{get(){return({completed:"connected",checking:"connecting"})[this.iceConnectionState]||this.iceConnectionState},enumerable:!0,configurable:!0}),Object.defineProperty(t,"onconnectionstatechange",{get(){return this._onconnectionstatechange||null},set(e){this._onconnectionstatechange&&(this.removeEventListener("connectionstatechange",this._onconnectionstatechange),delete this._onconnectionstatechange),e&&this.addEventListener("connectionstatechange",this._onconnectionstatechange=e)},enumerable:!0,configurable:!0}),["setLocalDescription","setRemoteDescription"].forEach(e=>{let n=t[e];t[e]=function(){return this._connectionstatechangepoly||(this._connectionstatechangepoly=e=>{let t=e.target;if(t._lastConnectionState!==t.connectionState){t._lastConnectionState=t.connectionState;let n=new Event("connectionstatechange",e);t.dispatchEvent(n)}return e},this.addEventListener("iceconnectionstatechange",this._connectionstatechangepoly)),n.apply(this,arguments)}})}function ev(e,t){if(!e.RTCPeerConnection||"chrome"===t.browser&&t.version>=71||"safari"===t.browser&&t.version>=605)return;let n=e.RTCPeerConnection.prototype.setRemoteDescription;e.RTCPeerConnection.prototype.setRemoteDescription=function(t){if(t&&t.sdp&&-1!==t.sdp.indexOf("\na=extmap-allow-mixed")){let n=t.sdp.split("\n").filter(e=>"a=extmap-allow-mixed"!==e.trim()).join("\n");e.RTCSessionDescription&&t instanceof e.RTCSessionDescription?arguments[0]=new e.RTCSessionDescription({type:t.type,sdp:n}):t.sdp=n}return n.apply(this,arguments)}}function ek(e,t){if(!(e.RTCPeerConnection&&e.RTCPeerConnection.prototype))return;let n=e.RTCPeerConnection.prototype.addIceCandidate;n&&0!==n.length&&(e.RTCPeerConnection.prototype.addIceCandidate=function(){return arguments[0]?("chrome"===t.browser&&t.version<78||"firefox"===t.browser&&t.version<68||"safari"===t.browser)&&arguments[0]&&""===arguments[0].candidate?Promise.resolve():n.apply(this,arguments):(arguments[1]&&arguments[1].apply(null),Promise.resolve())})}function eT(e,t){if(!(e.RTCPeerConnection&&e.RTCPeerConnection.prototype))return;let n=e.RTCPeerConnection.prototype.setLocalDescription;n&&0!==n.length&&(e.RTCPeerConnection.prototype.setLocalDescription=function(){let e=arguments[0]||{};if("object"!=typeof e||e.type&&e.sdp)return n.apply(this,arguments);if(!(e={type:e.type,sdp:e.sdp}).type)switch(this.signalingState){case"stable":case"have-local-offer":case"have-remote-pranswer":e.type="offer";break;default:e.type="answer"}return e.sdp||"offer"!==e.type&&"answer"!==e.type?n.apply(this,[e]):("offer"===e.type?this.createOffer:this.createAnswer).apply(this).then(e=>n.apply(this,[e]))})}em.generateIdentifier=function(){return Math.random().toString(36).substring(2,12)},em.localCName=em.generateIdentifier(),em.splitLines=function(e){return e.trim().split("\n").map(e=>e.trim())},em.splitSections=function(e){return e.split("\nm=").map((e,t)=>(t>0?"m="+e:e).trim()+"\r\n")},em.getDescription=function(e){let t=em.splitSections(e);return t&&t[0]},em.getMediaSections=function(e){let t=em.splitSections(e);return t.shift(),t},em.matchPrefix=function(e,t){return em.splitLines(e).filter(e=>0===e.indexOf(t))},em.parseCandidate=function(e){let t;let n={foundation:(t=0===e.indexOf("a=candidate:")?e.substring(12).split(" "):e.substring(10).split(" "))[0],component:{1:"rtp",2:"rtcp"}[t[1]]||t[1],protocol:t[2].toLowerCase(),priority:parseInt(t[3],10),ip:t[4],address:t[4],port:parseInt(t[5],10),type:t[7]};for(let e=8;e<t.length;e+=2)switch(t[e]){case"raddr":n.relatedAddress=t[e+1];break;case"rport":n.relatedPort=parseInt(t[e+1],10);break;case"tcptype":n.tcpType=t[e+1];break;case"ufrag":n.ufrag=t[e+1],n.usernameFragment=t[e+1];break;default:void 0===n[t[e]]&&(n[t[e]]=t[e+1])}return n},em.writeCandidate=function(e){let t=[];t.push(e.foundation);let n=e.component;"rtp"===n?t.push(1):"rtcp"===n?t.push(2):t.push(n),t.push(e.protocol.toUpperCase()),t.push(e.priority),t.push(e.address||e.ip),t.push(e.port);let r=e.type;return t.push("typ"),t.push(r),"host"!==r&&e.relatedAddress&&e.relatedPort&&(t.push("raddr"),t.push(e.relatedAddress),t.push("rport"),t.push(e.relatedPort)),e.tcpType&&"tcp"===e.protocol.toLowerCase()&&(t.push("tcptype"),t.push(e.tcpType)),(e.usernameFragment||e.ufrag)&&(t.push("ufrag"),t.push(e.usernameFragment||e.ufrag)),"candidate:"+t.join(" ")},em.parseIceOptions=function(e){return e.substring(14).split(" ")},em.parseRtpMap=function(e){let t=e.substring(9).split(" "),n={payloadType:parseInt(t.shift(),10)};return t=t[0].split("/"),n.name=t[0],n.clockRate=parseInt(t[1],10),n.channels=3===t.length?parseInt(t[2],10):1,n.numChannels=n.channels,n},em.writeRtpMap=function(e){let t=e.payloadType;void 0!==e.preferredPayloadType&&(t=e.preferredPayloadType);let n=e.channels||e.numChannels||1;return"a=rtpmap:"+t+" "+e.name+"/"+e.clockRate+(1!==n?"/"+n:"")+"\r\n"},em.parseExtmap=function(e){let t=e.substring(9).split(" ");return{id:parseInt(t[0],10),direction:t[0].indexOf("/")>0?t[0].split("/")[1]:"sendrecv",uri:t[1],attributes:t.slice(2).join(" ")}},em.writeExtmap=function(e){return"a=extmap:"+(e.id||e.preferredId)+(e.direction&&"sendrecv"!==e.direction?"/"+e.direction:"")+" "+e.uri+(e.attributes?" "+e.attributes:"")+"\r\n"},em.parseFmtp=function(e){let t;let n={},r=e.substring(e.indexOf(" ")+1).split(";");for(let e=0;e<r.length;e++)n[(t=r[e].trim().split("="))[0].trim()]=t[1];return n},em.writeFmtp=function(e){let t="",n=e.payloadType;if(void 0!==e.preferredPayloadType&&(n=e.preferredPayloadType),e.parameters&&Object.keys(e.parameters).length){let r=[];Object.keys(e.parameters).forEach(t=>{void 0!==e.parameters[t]?r.push(t+"="+e.parameters[t]):r.push(t)}),t+="a=fmtp:"+n+" "+r.join(";")+"\r\n"}return t},em.parseRtcpFb=function(e){let t=e.substring(e.indexOf(" ")+1).split(" ");return{type:t.shift(),parameter:t.join(" ")}},em.writeRtcpFb=function(e){let t="",n=e.payloadType;return void 0!==e.preferredPayloadType&&(n=e.preferredPayloadType),e.rtcpFeedback&&e.rtcpFeedback.length&&e.rtcpFeedback.forEach(e=>{t+="a=rtcp-fb:"+n+" "+e.type+(e.parameter&&e.parameter.length?" "+e.parameter:"")+"\r\n"}),t},em.parseSsrcMedia=function(e){let t=e.indexOf(" "),n={ssrc:parseInt(e.substring(7,t),10)},r=e.indexOf(":",t);return r>-1?(n.attribute=e.substring(t+1,r),n.value=e.substring(r+1)):n.attribute=e.substring(t+1),n},em.parseSsrcGroup=function(e){let t=e.substring(13).split(" ");return{semantics:t.shift(),ssrcs:t.map(e=>parseInt(e,10))}},em.getMid=function(e){let t=em.matchPrefix(e,"a=mid:")[0];if(t)return t.substring(6)},em.parseFingerprint=function(e){let t=e.substring(14).split(" ");return{algorithm:t[0].toLowerCase(),value:t[1].toUpperCase()}},em.getDtlsParameters=function(e,t){return{role:"auto",fingerprints:em.matchPrefix(e+t,"a=fingerprint:").map(em.parseFingerprint)}},em.writeDtlsParameters=function(e,t){let n="a=setup:"+t+"\r\n";return e.fingerprints.forEach(e=>{n+="a=fingerprint:"+e.algorithm+" "+e.value+"\r\n"}),n},em.parseCryptoLine=function(e){let t=e.substring(9).split(" ");return{tag:parseInt(t[0],10),cryptoSuite:t[1],keyParams:t[2],sessionParams:t.slice(3)}},em.writeCryptoLine=function(e){return"a=crypto:"+e.tag+" "+e.cryptoSuite+" "+("object"==typeof e.keyParams?em.writeCryptoKeyParams(e.keyParams):e.keyParams)+(e.sessionParams?" "+e.sessionParams.join(" "):"")+"\r\n"},em.parseCryptoKeyParams=function(e){if(0!==e.indexOf("inline:"))return null;let t=e.substring(7).split("|");return{keyMethod:"inline",keySalt:t[0],lifeTime:t[1],mkiValue:t[2]?t[2].split(":")[0]:void 0,mkiLength:t[2]?t[2].split(":")[1]:void 0}},em.writeCryptoKeyParams=function(e){return e.keyMethod+":"+e.keySalt+(e.lifeTime?"|"+e.lifeTime:"")+(e.mkiValue&&e.mkiLength?"|"+e.mkiValue+":"+e.mkiLength:"")},em.getCryptoParameters=function(e,t){return em.matchPrefix(e+t,"a=crypto:").map(em.parseCryptoLine)},em.getIceParameters=function(e,t){let n=em.matchPrefix(e+t,"a=ice-ufrag:")[0],r=em.matchPrefix(e+t,"a=ice-pwd:")[0];return n&&r?{usernameFragment:n.substring(12),password:r.substring(10)}:null},em.writeIceParameters=function(e){let t="a=ice-ufrag:"+e.usernameFragment+"\r\na=ice-pwd:"+e.password+"\r\n";return e.iceLite&&(t+="a=ice-lite\r\n"),t},em.parseRtpParameters=function(e){let t={codecs:[],headerExtensions:[],fecMechanisms:[],rtcp:[]},n=em.splitLines(e)[0].split(" ");t.profile=n[2];for(let r=3;r<n.length;r++){let i=n[r],o=em.matchPrefix(e,"a=rtpmap:"+i+" ")[0];if(o){let n=em.parseRtpMap(o),r=em.matchPrefix(e,"a=fmtp:"+i+" ");switch(n.parameters=r.length?em.parseFmtp(r[0]):{},n.rtcpFeedback=em.matchPrefix(e,"a=rtcp-fb:"+i+" ").map(em.parseRtcpFb),t.codecs.push(n),n.name.toUpperCase()){case"RED":case"ULPFEC":t.fecMechanisms.push(n.name.toUpperCase())}}}em.matchPrefix(e,"a=extmap:").forEach(e=>{t.headerExtensions.push(em.parseExtmap(e))});let r=em.matchPrefix(e,"a=rtcp-fb:* ").map(em.parseRtcpFb);return t.codecs.forEach(e=>{r.forEach(t=>{e.rtcpFeedback.find(e=>e.type===t.type&&e.parameter===t.parameter)||e.rtcpFeedback.push(t)})}),t},em.writeRtpDescription=function(e,t){let n="";n+="m="+e+" "+(t.codecs.length>0?"9":"0")+" "+(t.profile||"UDP/TLS/RTP/SAVPF")+" "+t.codecs.map(e=>void 0!==e.preferredPayloadType?e.preferredPayloadType:e.payloadType).join(" ")+"\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\n",t.codecs.forEach(e=>{n+=em.writeRtpMap(e)+em.writeFmtp(e)+em.writeRtcpFb(e)});let r=0;return t.codecs.forEach(e=>{e.maxptime>r&&(r=e.maxptime)}),r>0&&(n+="a=maxptime:"+r+"\r\n"),t.headerExtensions&&t.headerExtensions.forEach(e=>{n+=em.writeExtmap(e)}),n},em.parseRtpEncodingParameters=function(e){let t;let n=[],r=em.parseRtpParameters(e),i=-1!==r.fecMechanisms.indexOf("RED"),o=-1!==r.fecMechanisms.indexOf("ULPFEC"),s=em.matchPrefix(e,"a=ssrc:").map(e=>em.parseSsrcMedia(e)).filter(e=>"cname"===e.attribute),a=s.length>0&&s[0].ssrc,c=em.matchPrefix(e,"a=ssrc-group:FID").map(e=>e.substring(17).split(" ").map(e=>parseInt(e,10)));c.length>0&&c[0].length>1&&c[0][0]===a&&(t=c[0][1]),r.codecs.forEach(e=>{if("RTX"===e.name.toUpperCase()&&e.parameters.apt){let r={ssrc:a,codecPayloadType:parseInt(e.parameters.apt,10)};a&&t&&(r.rtx={ssrc:t}),n.push(r),i&&((r=JSON.parse(JSON.stringify(r))).fec={ssrc:a,mechanism:o?"red+ulpfec":"red"},n.push(r))}}),0===n.length&&a&&n.push({ssrc:a});let l=em.matchPrefix(e,"b=");return l.length&&(l=0===l[0].indexOf("b=TIAS:")?parseInt(l[0].substring(7),10):0===l[0].indexOf("b=AS:")?950*parseInt(l[0].substring(5),10)-16e3:void 0,n.forEach(e=>{e.maxBitrate=l})),n},em.parseRtcpParameters=function(e){let t={},n=em.matchPrefix(e,"a=ssrc:").map(e=>em.parseSsrcMedia(e)).filter(e=>"cname"===e.attribute)[0];n&&(t.cname=n.value,t.ssrc=n.ssrc);let r=em.matchPrefix(e,"a=rtcp-rsize");t.reducedSize=r.length>0,t.compound=0===r.length;let i=em.matchPrefix(e,"a=rtcp-mux");return t.mux=i.length>0,t},em.writeRtcpParameters=function(e){let t="";return e.reducedSize&&(t+="a=rtcp-rsize\r\n"),e.mux&&(t+="a=rtcp-mux\r\n"),void 0!==e.ssrc&&e.cname&&(t+="a=ssrc:"+e.ssrc+" cname:"+e.cname+"\r\n"),t},em.parseMsid=function(e){let t;let n=em.matchPrefix(e,"a=msid:");if(1===n.length)return{stream:(t=n[0].substring(7).split(" "))[0],track:t[1]};let r=em.matchPrefix(e,"a=ssrc:").map(e=>em.parseSsrcMedia(e)).filter(e=>"msid"===e.attribute);if(r.length>0)return{stream:(t=r[0].value.split(" "))[0],track:t[1]}},em.parseSctpDescription=function(e){let t;let n=em.parseMLine(e),r=em.matchPrefix(e,"a=max-message-size:");r.length>0&&(t=parseInt(r[0].substring(19),10)),isNaN(t)&&(t=65536);let i=em.matchPrefix(e,"a=sctp-port:");if(i.length>0)return{port:parseInt(i[0].substring(12),10),protocol:n.fmt,maxMessageSize:t};let o=em.matchPrefix(e,"a=sctpmap:");if(o.length>0){let e=o[0].substring(10).split(" ");return{port:parseInt(e[0],10),protocol:e[1],maxMessageSize:t}}},em.writeSctpDescription=function(e,t){let n=[];return n="DTLS/SCTP"!==e.protocol?["m="+e.kind+" 9 "+e.protocol+" "+t.protocol+"\r\n","c=IN IP4 0.0.0.0\r\n","a=sctp-port:"+t.port+"\r\n"]:["m="+e.kind+" 9 "+e.protocol+" "+t.port+"\r\n","c=IN IP4 0.0.0.0\r\n","a=sctpmap:"+t.port+" "+t.protocol+" 65535\r\n"],void 0!==t.maxMessageSize&&n.push("a=max-message-size:"+t.maxMessageSize+"\r\n"),n.join("")},em.generateSessionId=function(){return Math.random().toString().substr(2,22)},em.writeSessionBoilerplate=function(e,t,n){return"v=0\r\no="+(n||"thisisadapterortc")+" "+(e||em.generateSessionId())+" "+(void 0!==t?t:2)+" IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n"},em.getDirection=function(e,t){let n=em.splitLines(e);for(let e=0;e<n.length;e++)switch(n[e]){case"a=sendrecv":case"a=sendonly":case"a=recvonly":case"a=inactive":return n[e].substring(2)}return t?em.getDirection(t):"sendrecv"},em.getKind=function(e){return em.splitLines(e)[0].split(" ")[0].substring(2)},em.isRejected=function(e){return"0"===e.split(" ",2)[1]},em.parseMLine=function(e){let t=em.splitLines(e)[0].substring(2).split(" ");return{kind:t[0],port:parseInt(t[1],10),protocol:t[2],fmt:t.slice(3).join(" ")}},em.parseOLine=function(e){let t=em.matchPrefix(e,"o=")[0].substring(2).split(" ");return{username:t[0],sessionId:t[1],sessionVersion:parseInt(t[2],10),netType:t[3],addressType:t[4],address:t[5]}},em.isValidSDP=function(e){if("string"!=typeof e||0===e.length)return!1;let t=em.splitLines(e);for(let e=0;e<t.length;e++)if(t[e].length<2||"="!==t[e].charAt(1))return!1;return!0},ef=em;let eS=function({window:e}={},t={shimChrome:!0,shimFirefox:!0,shimSafari:!0}){let n=function(e){let t={browser:null,version:null};if(void 0===e||!e.navigator||!e.navigator.userAgent)return t.browser="Not a browser.",t;let{navigator:n}=e;if(n.userAgentData&&n.userAgentData.brands){let e=n.userAgentData.brands.find(e=>"Chromium"===e.brand);if(e)return{browser:"chrome",version:parseInt(e.version,10)}}return n.mozGetUserMedia?(t.browser="firefox",t.version=p(n.userAgent,/Firefox\/(\d+)\./,1)):n.webkitGetUserMedia||!1===e.isSecureContext&&e.webkitRTCPeerConnection?(t.browser="chrome",t.version=p(n.userAgent,/Chrom(e|ium)\/(\d+)\./,2)):e.RTCPeerConnection&&n.userAgent.match(/AppleWebKit\/(\d+)\./)?(t.browser="safari",t.version=p(n.userAgent,/AppleWebKit\/(\d+)\./,1),t.supportsUnifiedPlan=e.RTCRtpTransceiver&&"currentDirection"in e.RTCRtpTransceiver.prototype):t.browser="Not a supported browser.",t}(e),r={browserDetails:n,commonShim:eu,extractVersion:p,disableLog:h,disableWarnings:u,sdp:ef};switch(n.browser){case"chrome":if(!j||!j.shimPeerConnection||!t.shimChrome){f("Chrome shim is not included in this adapter release.");break}if(null===n.version){f("Chrome shim can not determine version, not shimming.");break}f("adapter.js shimming chrome."),r.browserShim=j,ek(e,n),eT(e,n),j.shimGetUserMedia(e,n),j.shimMediaStream(e,n),j.shimPeerConnection(e,n),j.shimOnTrack(e,n),j.shimAddTrackRemoveTrack(e,n),j.shimGetSendersWithDtmf(e,n),j.shimSenderReceiverGetStats(e,n),j.fixNegotiationNeeded(e,n),eg(e,n),ey(e,n),eb(e,n),e_(e,n),eC(e,n),ev(e,n);break;case"firefox":if(!V||!V.shimPeerConnection||!t.shimFirefox){f("Firefox shim is not included in this adapter release.");break}f("adapter.js shimming firefox."),r.browserShim=V,ek(e,n),eT(e,n),V.shimGetUserMedia(e,n),V.shimPeerConnection(e,n),V.shimOnTrack(e,n),V.shimRemoveStream(e,n),V.shimSenderGetStats(e,n),V.shimReceiverGetStats(e,n),V.shimRTCDataChannel(e,n),V.shimAddTransceiver(e,n),V.shimGetParameters(e,n),V.shimCreateOffer(e,n),V.shimCreateAnswer(e,n),eg(e,n),eb(e,n),e_(e,n),eC(e,n);break;case"safari":if(!er||!t.shimSafari){f("Safari shim is not included in this adapter release.");break}f("adapter.js shimming safari."),r.browserShim=er,ek(e,n),eT(e,n),er.shimRTCIceServerUrls(e,n),er.shimCreateOfferLegacy(e,n),er.shimCallbacksAPI(e,n),er.shimLocalStreamsAPI(e,n),er.shimRemoteStreamsAPI(e,n),er.shimTrackEventTransceiver(e,n),er.shimGetUserMedia(e,n),er.shimAudioContext(e,n),eg(e,n),ey(e,n),e_(e,n),eC(e,n),ev(e,n);break;default:f("Unsupported browser!")}return r}({window:"undefined"==typeof window?void 0:window}),eR=eS.default||eS,eP=new class{isWebRTCSupported(){return"undefined"!=typeof RTCPeerConnection}isBrowserSupported(){let e=this.getBrowser(),t=this.getVersion();return!!this.supportedBrowsers.includes(e)&&("chrome"===e?t>=this.minChromeVersion:"firefox"===e?t>=this.minFirefoxVersion:"safari"===e&&!this.isIOS&&t>=this.minSafariVersion)}getBrowser(){return eR.browserDetails.browser}getVersion(){return eR.browserDetails.version||0}isUnifiedPlanSupported(){let e;let t=this.getBrowser(),n=eR.browserDetails.version||0;if("chrome"===t&&n<this.minChromeVersion)return!1;if("firefox"===t&&n>=this.minFirefoxVersion)return!0;if(!window.RTCRtpTransceiver||!("currentDirection"in RTCRtpTransceiver.prototype))return!1;let r=!1;try{(e=new RTCPeerConnection).addTransceiver("audio"),r=!0}catch(e){}finally{e&&e.close()}return r}toString(){return`Supports:
+    browser:${this.getBrowser()}
+    version:${this.getVersion()}
+    isIOS:${this.isIOS}
+    isWebRTCSupported:${this.isWebRTCSupported()}
+    isBrowserSupported:${this.isBrowserSupported()}
+    isUnifiedPlanSupported:${this.isUnifiedPlanSupported()}`}constructor(){this.isIOS="undefined"!=typeof navigator&&["iPad","iPhone","iPod"].includes(navigator.platform),this.supportedBrowsers=["firefox","chrome","safari"],this.minFirefoxVersion=59,this.minChromeVersion=72,this.minSafariVersion=605}},ew=e=>!e||/^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/.test(e),eE=()=>Math.random().toString(36).slice(2),eD={iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:["turn:eu-0.turn.peerjs.com:3478","turn:us-0.turn.peerjs.com:3478"],username:"peerjs",credential:"peerjsp"}],sdpSemantics:"unified-plan"},ex=new class extends n{noop(){}blobToArrayBuffer(e,t){let n=new FileReader;return n.onload=function(e){e.target&&t(e.target.result)},n.readAsArrayBuffer(e),n}binaryStringToArrayBuffer(e){let t=new Uint8Array(e.length);for(let n=0;n<e.length;n++)t[n]=255&e.charCodeAt(n);return t.buffer}isSecure(){return"https:"===location.protocol}constructor(...e){super(...e),this.CLOUD_HOST="0.peerjs.com",this.CLOUD_PORT=443,this.chunkedBrowsers={Chrome:1,chrome:1},this.defaultConfig=eD,this.browser=eP.getBrowser(),this.browserVersion=eP.getVersion(),this.pack=o,this.unpack=i,this.supports=function(){let e;let t={browser:eP.isBrowserSupported(),webRTC:eP.isWebRTCSupported(),audioVideo:!1,data:!1,binaryBlob:!1,reliable:!1};if(!t.webRTC)return t;try{let n;e=new RTCPeerConnection(eD),t.audioVideo=!0;try{n=e.createDataChannel("_PEERJSTEST",{ordered:!0}),t.data=!0,t.reliable=!!n.ordered;try{n.binaryType="blob",t.binaryBlob=!eP.isIOS}catch(e){}}catch(e){}finally{n&&n.close()}}catch(e){}finally{e&&e.close()}return t}(),this.validateId=ew,this.randomToken=eE}};(_=P||(P={}))[_.Disabled=0]="Disabled",_[_.Errors=1]="Errors",_[_.Warnings=2]="Warnings",_[_.All=3]="All";var eI=new class{get logLevel(){return this._logLevel}set logLevel(e){this._logLevel=e}log(...e){this._logLevel>=3&&this._print(3,...e)}warn(...e){this._logLevel>=2&&this._print(2,...e)}error(...e){this._logLevel>=1&&this._print(1,...e)}setLogFunction(e){this._print=e}_print(e,...t){let n=["PeerJS: ",...t];for(let e in n)n[e]instanceof Error&&(n[e]="("+n[e].name+") "+n[e].message);e>=3?console.log(...n):e>=2?console.warn("WARNING",...n):e>=1&&console.error("ERROR",...n)}constructor(){this._logLevel=0}},eM={},eO=Object.prototype.hasOwnProperty,ej="~";function eL(){}function eA(e,t,n){this.fn=e,this.context=t,this.once=n||!1}function eB(e,t,n,r,i){if("function"!=typeof n)throw TypeError("The listener must be a function");var o=new eA(n,r||e,i),s=ej?ej+t:t;return e._events[s]?e._events[s].fn?e._events[s]=[e._events[s],o]:e._events[s].push(o):(e._events[s]=o,e._eventsCount++),e}function eF(e,t){0==--e._eventsCount?e._events=new eL:delete e._events[t]}function eU(){this._events=new eL,this._eventsCount=0}Object.create&&(eL.prototype=Object.create(null),new eL().__proto__||(ej=!1)),eU.prototype.eventNames=function(){var e,t,n=[];if(0===this._eventsCount)return n;for(t in e=this._events)eO.call(e,t)&&n.push(ej?t.slice(1):t);return Object.getOwnPropertySymbols?n.concat(Object.getOwnPropertySymbols(e)):n},eU.prototype.listeners=function(e){var t=ej?ej+e:e,n=this._events[t];if(!n)return[];if(n.fn)return[n.fn];for(var r=0,i=n.length,o=Array(i);r<i;r++)o[r]=n[r].fn;return o},eU.prototype.listenerCount=function(e){var t=ej?ej+e:e,n=this._events[t];return n?n.fn?1:n.length:0},eU.prototype.emit=function(e,t,n,r,i,o){var s=ej?ej+e:e;if(!this._events[s])return!1;var a,c,l=this._events[s],p=arguments.length;if(l.fn){switch(l.once&&this.removeListener(e,l.fn,void 0,!0),p){case 1:return l.fn.call(l.context),!0;case 2:return l.fn.call(l.context,t),!0;case 3:return l.fn.call(l.context,t,n),!0;case 4:return l.fn.call(l.context,t,n,r),!0;case 5:return l.fn.call(l.context,t,n,r,i),!0;case 6:return l.fn.call(l.context,t,n,r,i,o),!0}for(c=1,a=Array(p-1);c<p;c++)a[c-1]=arguments[c];l.fn.apply(l.context,a)}else{var d,h=l.length;for(c=0;c<h;c++)switch(l[c].once&&this.removeListener(e,l[c].fn,void 0,!0),p){case 1:l[c].fn.call(l[c].context);break;case 2:l[c].fn.call(l[c].context,t);break;case 3:l[c].fn.call(l[c].context,t,n);break;case 4:l[c].fn.call(l[c].context,t,n,r);break;default:if(!a)for(d=1,a=Array(p-1);d<p;d++)a[d-1]=arguments[d];l[c].fn.apply(l[c].context,a)}}return!0},eU.prototype.on=function(e,t,n){return eB(this,e,t,n,!1)},eU.prototype.once=function(e,t,n){return eB(this,e,t,n,!0)},eU.prototype.removeListener=function(e,t,n,r){var i=ej?ej+e:e;if(!this._events[i])return this;if(!t)return eF(this,i),this;var o=this._events[i];if(o.fn)o.fn!==t||r&&!o.once||n&&o.context!==n||eF(this,i);else{for(var s=0,a=[],c=o.length;s<c;s++)(o[s].fn!==t||r&&!o[s].once||n&&o[s].context!==n)&&a.push(o[s]);a.length?this._events[i]=1===a.length?a[0]:a:eF(this,i)}return this},eU.prototype.removeAllListeners=function(e){var t;return e?(t=ej?ej+e:e,this._events[t]&&eF(this,t)):(this._events=new eL,this._eventsCount=0),this},eU.prototype.off=eU.prototype.removeListener,eU.prototype.addListener=eU.prototype.on,eU.prefixed=ej,eU.EventEmitter=eU,eM=eU,(C=w||(w={})).Data="data",C.Media="media",(b=E||(E={})).BrowserIncompatible="browser-incompatible",b.Disconnected="disconnected",b.InvalidID="invalid-id",b.InvalidKey="invalid-key",b.Network="network",b.PeerUnavailable="peer-unavailable",b.SslUnavailable="ssl-unavailable",b.ServerError="server-error",b.SocketError="socket-error",b.SocketClosed="socket-closed",b.UnavailableID="unavailable-id",b.WebRTC="webrtc",(v=D||(D={})).NegotiationFailed="negotiation-failed",v.ConnectionClosed="connection-closed",(k=x||(x={})).NotOpenYet="not-open-yet",k.MessageToBig="message-too-big",(T=I||(I={})).Binary="binary",T.BinaryUTF8="binary-utf8",T.JSON="json",T.None="raw",(S=M||(M={})).Message="message",S.Disconnected="disconnected",S.Error="error",S.Close="close",(R=O||(O={})).Heartbeat="HEARTBEAT",R.Candidate="CANDIDATE",R.Offer="OFFER",R.Answer="ANSWER",R.Open="OPEN",R.Error="ERROR",R.IdTaken="ID-TAKEN",R.InvalidKey="INVALID-KEY",R.Leave="LEAVE",R.Expire="EXPIRE";var ez={};ez=JSON.parse('{"name":"peerjs","version":"1.5.4","keywords":["peerjs","webrtc","p2p","rtc"],"description":"PeerJS client","homepage":"https://peerjs.com","bugs":{"url":"https://github.com/peers/peerjs/issues"},"repository":{"type":"git","url":"https://github.com/peers/peerjs"},"license":"MIT","contributors":["Michelle Bu <michelle@michellebu.com>","afrokick <devbyru@gmail.com>","ericz <really.ez@gmail.com>","Jairo <kidandcat@gmail.com>","Jonas Gloning <34194370+jonasgloning@users.noreply.github.com>","Jairo Caro-Accino Viciana <jairo@galax.be>","Carlos Caballero <carlos.caballero.gonzalez@gmail.com>","hc <hheennrryy@gmail.com>","Muhammad Asif <capripio@gmail.com>","PrashoonB <prashoonbhattacharjee@gmail.com>","Harsh Bardhan Mishra <47351025+HarshCasper@users.noreply.github.com>","akotynski <aleksanderkotbury@gmail.com>","lmb <i@lmb.io>","Jairooo <jairocaro@msn.com>","Moritz Stückler <moritz.stueckler@gmail.com>","Simon <crydotsnakegithub@gmail.com>","Denis Lukov <denismassters@gmail.com>","Philipp Hancke <fippo@andyet.net>","Hans Oksendahl <hansoksendahl@gmail.com>","Jess <jessachandler@gmail.com>","khankuan <khankuan@gmail.com>","DUODVK <kurmanov.work@gmail.com>","XiZhao <kwang1imsa@gmail.com>","Matthias Lohr <matthias@lohr.me>","=frank tree <=frnktrb@googlemail.com>","Andre Eckardt <aeckardt@outlook.com>","Chris Cowan <agentme49@gmail.com>","Alex Chuev <alex@chuev.com>","alxnull <alxnull@e.mail.de>","Yemel Jardi <angel.jardi@gmail.com>","Ben Parnell <benjaminparnell.94@gmail.com>","Benny Lichtner <bennlich@gmail.com>","fresheneesz <bitetrudpublic@gmail.com>","bob.barstead@exaptive.com <bob.barstead@exaptive.com>","chandika <chandika@gmail.com>","emersion <contact@emersion.fr>","Christopher Van <cvan@users.noreply.github.com>","eddieherm <edhermoso@gmail.com>","Eduardo Pinho <enet4mikeenet@gmail.com>","Evandro Zanatta <ezanatta@tray.net.br>","Gardner Bickford <gardner@users.noreply.github.com>","Gian Luca <gianluca.cecchi@cynny.com>","PatrickJS <github@gdi2290.com>","jonnyf <github@jonathanfoss.co.uk>","Hizkia Felix <hizkifw@gmail.com>","Hristo Oskov <hristo.oskov@gmail.com>","Isaac Madwed <i.madwed@gmail.com>","Ilya Konanykhin <ilya.konanykhin@gmail.com>","jasonbarry <jasbarry@me.com>","Jonathan Burke <jonathan.burke.1311@googlemail.com>","Josh Hamit <josh.hamit@gmail.com>","Jordan Austin <jrax86@gmail.com>","Joel Wetzell <jwetzell@yahoo.com>","xizhao <kevin.wang@cloudera.com>","Alberto Torres <kungfoobar@gmail.com>","Jonathan Mayol <mayoljonathan@gmail.com>","Jefferson Felix <me@jsfelix.dev>","Rolf Erik Lekang <me@rolflekang.com>","Kevin Mai-Husan Chia <mhchia@users.noreply.github.com>","Pepijn de Vos <pepijndevos@gmail.com>","JooYoung <qkdlql@naver.com>","Tobias Speicher <rootcommander@gmail.com>","Steve Blaurock <sblaurock@gmail.com>","Kyrylo Shegeda <shegeda@ualberta.ca>","Diwank Singh Tomer <singh@diwank.name>","Sören Balko <Soeren.Balko@gmail.com>","Arpit Solanki <solankiarpit1997@gmail.com>","Yuki Ito <yuki@gnnk.net>","Artur Zayats <zag2art@gmail.com>"],"funding":{"type":"opencollective","url":"https://opencollective.com/peer"},"collective":{"type":"opencollective","url":"https://opencollective.com/peer"},"files":["dist/*"],"sideEffects":["lib/global.ts","lib/supports.ts"],"main":"dist/bundler.cjs","module":"dist/bundler.mjs","browser-minified":"dist/peerjs.min.js","browser-unminified":"dist/peerjs.js","browser-minified-msgpack":"dist/serializer.msgpack.mjs","types":"dist/types.d.ts","engines":{"node":">= 14"},"targets":{"types":{"source":"lib/exports.ts"},"main":{"source":"lib/exports.ts","sourceMap":{"inlineSources":true}},"module":{"source":"lib/exports.ts","includeNodeModules":["eventemitter3"],"sourceMap":{"inlineSources":true}},"browser-minified":{"context":"browser","outputFormat":"global","optimize":true,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 80, safari >= 15"},"source":"lib/global.ts"},"browser-unminified":{"context":"browser","outputFormat":"global","optimize":false,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 80, safari >= 15"},"source":"lib/global.ts"},"browser-minified-msgpack":{"context":"browser","outputFormat":"esmodule","isLibrary":true,"optimize":true,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 102, safari >= 15"},"source":"lib/dataconnection/StreamConnection/MsgPack.ts"}},"scripts":{"contributors":"git-authors-cli --print=false && prettier --write package.json && git add package.json package-lock.json && git commit -m \\"chore(contributors): update and sort contributors list\\"","check":"tsc --noEmit && tsc -p e2e/tsconfig.json --noEmit","watch":"parcel watch","build":"rm -rf dist && parcel build","prepublishOnly":"npm run build","test":"jest","test:watch":"jest --watch","coverage":"jest --coverage --collectCoverageFrom=\\"./lib/**\\"","format":"prettier --write .","format:check":"prettier --check .","semantic-release":"semantic-release","e2e":"wdio run e2e/wdio.local.conf.ts","e2e:bstack":"wdio run e2e/wdio.bstack.conf.ts"},"devDependencies":{"@parcel/config-default":"^2.9.3","@parcel/packager-ts":"^2.9.3","@parcel/transformer-typescript-tsc":"^2.9.3","@parcel/transformer-typescript-types":"^2.9.3","@semantic-release/changelog":"^6.0.1","@semantic-release/git":"^10.0.1","@swc/core":"^1.3.27","@swc/jest":"^0.2.24","@types/jasmine":"^4.3.4","@wdio/browserstack-service":"^8.11.2","@wdio/cli":"^8.11.2","@wdio/globals":"^8.11.2","@wdio/jasmine-framework":"^8.11.2","@wdio/local-runner":"^8.11.2","@wdio/spec-reporter":"^8.11.2","@wdio/types":"^8.10.4","http-server":"^14.1.1","jest":"^29.3.1","jest-environment-jsdom":"^29.3.1","mock-socket":"^9.0.0","parcel":"^2.9.3","prettier":"^3.0.0","semantic-release":"^21.0.0","ts-node":"^10.9.1","typescript":"^5.0.0","wdio-geckodriver-service":"^5.0.1"},"dependencies":{"@msgpack/msgpack":"^2.8.0","eventemitter3":"^4.0.7","peerjs-js-binarypack":"^2.1.0","webrtc-adapter":"^9.0.0"},"alias":{"process":false,"buffer":false}}');class eN extends eM.EventEmitter{start(e,t){this._id=e;let n=`${this._baseUrl}&id=${e}&token=${t}`;!this._socket&&this._disconnected&&(this._socket=new WebSocket(n+"&version="+ez.version),this._disconnected=!1,this._socket.onmessage=e=>{let t;try{t=JSON.parse(e.data),eI.log("Server message received:",t)}catch(t){eI.log("Invalid server message",e.data);return}this.emit(M.Message,t)},this._socket.onclose=e=>{this._disconnected||(eI.log("Socket closed.",e),this._cleanup(),this._disconnected=!0,this.emit(M.Disconnected))},this._socket.onopen=()=>{this._disconnected||(this._sendQueuedMessages(),eI.log("Socket open"),this._scheduleHeartbeat())})}_scheduleHeartbeat(){this._wsPingTimer=setTimeout(()=>{this._sendHeartbeat()},this.pingInterval)}_sendHeartbeat(){if(!this._wsOpen()){eI.log("Cannot send heartbeat, because socket closed");return}let e=JSON.stringify({type:O.Heartbeat});this._socket.send(e),this._scheduleHeartbeat()}_wsOpen(){return!!this._socket&&1===this._socket.readyState}_sendQueuedMessages(){let e=[...this._messagesQueue];for(let t of(this._messagesQueue=[],e))this.send(t)}send(e){if(this._disconnected)return;if(!this._id){this._messagesQueue.push(e);return}if(!e.type){this.emit(M.Error,"Invalid message");return}if(!this._wsOpen())return;let t=JSON.stringify(e);this._socket.send(t)}close(){this._disconnected||(this._cleanup(),this._disconnected=!0)}_cleanup(){this._socket&&(this._socket.onopen=this._socket.onmessage=this._socket.onclose=null,this._socket.close(),this._socket=void 0),clearTimeout(this._wsPingTimer)}constructor(e,t,n,r,i,o=5e3){super(),this.pingInterval=o,this._disconnected=!0,this._messagesQueue=[],this._baseUrl=(e?"wss://":"ws://")+t+":"+n+r+"peerjs?key="+i}}class e${startConnection(e){let t=this._startPeerConnection();if(this.connection.peerConnection=t,this.connection.type===w.Media&&e._stream&&this._addTracksToConnection(e._stream,t),e.originator){let n=this.connection,r={ordered:!!e.reliable},i=t.createDataChannel(n.label,r);n._initializeDataChannel(i),this._makeOffer()}else this.handleSDP("OFFER",e.sdp)}_startPeerConnection(){eI.log("Creating RTCPeerConnection.");let e=new RTCPeerConnection(this.connection.provider.options.config);return this._setupListeners(e),e}_setupListeners(e){let t=this.connection.peer,n=this.connection.connectionId,r=this.connection.type,i=this.connection.provider;eI.log("Listening for ICE candidates."),e.onicecandidate=e=>{e.candidate&&e.candidate.candidate&&(eI.log(`Received ICE candidates for ${t}:`,e.candidate),i.socket.send({type:O.Candidate,payload:{candidate:e.candidate,type:r,connectionId:n},dst:t}))},e.oniceconnectionstatechange=()=>{switch(e.iceConnectionState){case"failed":eI.log("iceConnectionState is failed, closing connections to "+t),this.connection.emitError(D.NegotiationFailed,"Negotiation of connection to "+t+" failed."),this.connection.close();break;case"closed":eI.log("iceConnectionState is closed, closing connections to "+t),this.connection.emitError(D.ConnectionClosed,"Connection to "+t+" closed."),this.connection.close();break;case"disconnected":eI.log("iceConnectionState changed to disconnected on the connection with "+t);break;case"completed":e.onicecandidate=()=>{}}this.connection.emit("iceStateChanged",e.iceConnectionState)},eI.log("Listening for data channel"),e.ondatachannel=e=>{eI.log("Received data channel");let r=e.channel;i.getConnection(t,n)._initializeDataChannel(r)},eI.log("Listening for remote stream"),e.ontrack=e=>{eI.log("Received remote stream");let r=e.streams[0],o=i.getConnection(t,n);o.type===w.Media&&this._addStreamToMediaConnection(r,o)}}cleanup(){eI.log("Cleaning up PeerConnection to "+this.connection.peer);let e=this.connection.peerConnection;if(!e)return;this.connection.peerConnection=null,e.onicecandidate=e.oniceconnectionstatechange=e.ondatachannel=e.ontrack=()=>{};let t="closed"!==e.signalingState,n=!1,r=this.connection.dataChannel;r&&(n=!!r.readyState&&"closed"!==r.readyState),(t||n)&&e.close()}async _makeOffer(){let e=this.connection.peerConnection,t=this.connection.provider;try{let n=await e.createOffer(this.connection.options.constraints);eI.log("Created offer."),this.connection.options.sdpTransform&&"function"==typeof this.connection.options.sdpTransform&&(n.sdp=this.connection.options.sdpTransform(n.sdp)||n.sdp);try{await e.setLocalDescription(n),eI.log("Set localDescription:",n,`for:${this.connection.peer}`);let r={sdp:n,type:this.connection.type,connectionId:this.connection.connectionId,metadata:this.connection.metadata};if(this.connection.type===w.Data){let e=this.connection;r={...r,label:e.label,reliable:e.reliable,serialization:e.serialization}}t.socket.send({type:O.Offer,payload:r,dst:this.connection.peer})}catch(e){"OperationError: Failed to set local offer sdp: Called in wrong state: kHaveRemoteOffer"!=e&&(t.emitError(E.WebRTC,e),eI.log("Failed to setLocalDescription, ",e))}}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to createOffer, ",e)}}async _makeAnswer(){let e=this.connection.peerConnection,t=this.connection.provider;try{let n=await e.createAnswer();eI.log("Created answer."),this.connection.options.sdpTransform&&"function"==typeof this.connection.options.sdpTransform&&(n.sdp=this.connection.options.sdpTransform(n.sdp)||n.sdp);try{await e.setLocalDescription(n),eI.log("Set localDescription:",n,`for:${this.connection.peer}`),t.socket.send({type:O.Answer,payload:{sdp:n,type:this.connection.type,connectionId:this.connection.connectionId},dst:this.connection.peer})}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to setLocalDescription, ",e)}}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to create answer, ",e)}}async handleSDP(e,t){t=new RTCSessionDescription(t);let n=this.connection.peerConnection,r=this.connection.provider;eI.log("Setting remote description",t);try{await n.setRemoteDescription(t),eI.log(`Set remoteDescription:${e} for:${this.connection.peer}`),"OFFER"===e&&await this._makeAnswer()}catch(e){r.emitError(E.WebRTC,e),eI.log("Failed to setRemoteDescription, ",e)}}async handleCandidate(e){eI.log("handleCandidate:",e);try{await this.connection.peerConnection.addIceCandidate(e),eI.log(`Added ICE candidate for:${this.connection.peer}`)}catch(e){this.connection.provider.emitError(E.WebRTC,e),eI.log("Failed to handleCandidate, ",e)}}_addTracksToConnection(e,t){if(eI.log(`add tracks from stream ${e.id} to peer connection`),!t.addTrack)return eI.error("Your browser does't support RTCPeerConnection#addTrack. Ignored.");e.getTracks().forEach(n=>{t.addTrack(n,e)})}_addStreamToMediaConnection(e,t){eI.log(`add stream ${e.id} to media connection ${t.connectionId}`),t.addStream(e)}constructor(e){this.connection=e}}class eJ extends eM.EventEmitter{emitError(e,t){eI.error("Error:",t),this.emit("error",new eV(`${e}`,t))}}class eV extends Error{constructor(e,t){"string"==typeof t?super(t):(super(),Object.assign(this,t)),this.type=e}}class eG extends eJ{get open(){return this._open}constructor(e,t,n){super(),this.peer=e,this.provider=t,this.options=n,this._open=!1,this.metadata=n.metadata}}class eW extends eG{get type(){return w.Media}get localStream(){return this._localStream}get remoteStream(){return this._remoteStream}_initializeDataChannel(e){this.dataChannel=e,this.dataChannel.onopen=()=>{eI.log(`DC#${this.connectionId} dc connection success`),this.emit("willCloseOnRemote")},this.dataChannel.onclose=()=>{eI.log(`DC#${this.connectionId} dc closed for:`,this.peer),this.close()}}addStream(e){eI.log("Receiving stream",e),this._remoteStream=e,super.emit("stream",e)}handleMessage(e){let t=e.type,n=e.payload;switch(e.type){case O.Answer:this._negotiator.handleSDP(t,n.sdp),this._open=!0;break;case O.Candidate:this._negotiator.handleCandidate(n.candidate);break;default:eI.warn(`Unrecognized message type:${t} from peer:${this.peer}`)}}answer(e,t={}){if(this._localStream){eI.warn("Local stream already exists on this MediaConnection. Are you answering a call twice?");return}for(let n of(this._localStream=e,t&&t.sdpTransform&&(this.options.sdpTransform=t.sdpTransform),this._negotiator.startConnection({...this.options._payload,_stream:e}),this.provider._getMessages(this.connectionId)))this.handleMessage(n);this._open=!0}close(){this._negotiator&&(this._negotiator.cleanup(),this._negotiator=null),this._localStream=null,this._remoteStream=null,this.provider&&(this.provider._removeConnection(this),this.provider=null),this.options&&this.options._stream&&(this.options._stream=null),this.open&&(this._open=!1,super.emit("close"))}constructor(e,t,n){super(e,t,n),this._localStream=this.options._stream,this.connectionId=this.options.connectionId||eW.ID_PREFIX+ex.randomToken(),this._negotiator=new e$(this),this._localStream&&this._negotiator.startConnection({_stream:this._localStream,originator:!0})}}eW.ID_PREFIX="mc_";class eH{_buildRequest(e){let t=this._options.secure?"https":"http",{host:n,port:r,path:i,key:o}=this._options,s=new URL(`${t}://${n}:${r}${i}${o}/${e}`);return s.searchParams.set("ts",`${Date.now()}${Math.random()}`),s.searchParams.set("version",ez.version),fetch(s.href,{referrerPolicy:this._options.referrerPolicy})}async retrieveId(){try{let e=await this._buildRequest("id");if(200!==e.status)throw Error(`Error. Status:${e.status}`);return e.text()}catch(t){eI.error("Error retrieving ID",t);let e="";throw"/"===this._options.path&&this._options.host!==ex.CLOUD_HOST&&(e=" If you passed in a `path` to your self-hosted PeerServer, you'll also need to pass in that same path when creating a new Peer."),Error("Could not get an ID from the server."+e)}}async listAllPeers(){try{let e=await this._buildRequest("peers");if(200!==e.status){if(401===e.status){let e="";throw e=this._options.host===ex.CLOUD_HOST?"It looks like you're using the cloud server. You can email team@peerjs.com to enable peer listing for your API key.":"You need to enable `allow_discovery` on your self-hosted PeerServer to use this feature.",Error("It doesn't look like you have permission to list peers IDs. "+e)}throw Error(`Error. Status:${e.status}`)}return e.json()}catch(e){throw eI.error("Error retrieving list peers",e),Error("Could not get list peers from the server."+e)}}constructor(e){this._options=e}}class eY extends eG{get type(){return w.Data}_initializeDataChannel(e){this.dataChannel=e,this.dataChannel.onopen=()=>{eI.log(`DC#${this.connectionId} dc connection success`),this._open=!0,this.emit("open")},this.dataChannel.onmessage=e=>{eI.log(`DC#${this.connectionId} dc onmessage:`,e.data)},this.dataChannel.onclose=()=>{eI.log(`DC#${this.connectionId} dc closed for:`,this.peer),this.close()}}close(e){if(e?.flush){this.send({__peerData:{type:"close"}});return}this._negotiator&&(this._negotiator.cleanup(),this._negotiator=null),this.provider&&(this.provider._removeConnection(this),this.provider=null),this.dataChannel&&(this.dataChannel.onopen=null,this.dataChannel.onmessage=null,this.dataChannel.onclose=null,this.dataChannel=null),this.open&&(this._open=!1,super.emit("close"))}send(e,t=!1){if(!this.open){this.emitError(x.NotOpenYet,"Connection is not open. You should listen for the `open` event before sending messages.");return}return this._send(e,t)}async handleMessage(e){let t=e.payload;switch(e.type){case O.Answer:await this._negotiator.handleSDP(e.type,t.sdp);break;case O.Candidate:await this._negotiator.handleCandidate(t.candidate);break;default:eI.warn("Unrecognized message type:",e.type,"from peer:",this.peer)}}constructor(e,t,n){super(e,t,n),this.connectionId=this.options.connectionId||eY.ID_PREFIX+eE(),this.label=this.options.label||this.connectionId,this.reliable=!!this.options.reliable,this._negotiator=new e$(this),this._negotiator.startConnection(this.options._payload||{originator:!0,reliable:this.reliable})}}eY.ID_PREFIX="dc_",eY.MAX_BUFFERED_AMOUNT=8388608;class eK extends eY{get bufferSize(){return this._bufferSize}_initializeDataChannel(e){super._initializeDataChannel(e),this.dataChannel.binaryType="arraybuffer",this.dataChannel.addEventListener("message",e=>this._handleDataMessage(e))}_bufferedSend(e){(this._buffering||!this._trySend(e))&&(this._buffer.push(e),this._bufferSize=this._buffer.length)}_trySend(e){if(!this.open)return!1;if(this.dataChannel.bufferedAmount>eY.MAX_BUFFERED_AMOUNT)return this._buffering=!0,setTimeout(()=>{this._buffering=!1,this._tryBuffer()},50),!1;try{this.dataChannel.send(e)}catch(e){return eI.error(`DC#:${this.connectionId} Error when sending:`,e),this._buffering=!0,this.close(),!1}return!0}_tryBuffer(){if(!this.open||0===this._buffer.length)return;let e=this._buffer[0];this._trySend(e)&&(this._buffer.shift(),this._bufferSize=this._buffer.length,this._tryBuffer())}close(e){if(e?.flush){this.send({__peerData:{type:"close"}});return}this._buffer=[],this._bufferSize=0,super.close()}constructor(...e){super(...e),this._buffer=[],this._bufferSize=0,this._buffering=!1}}class eX extends eK{close(e){super.close(e),this._chunkedData={}}_handleDataMessage({data:e}){let t=i(e),n=t.__peerData;if(n){if("close"===n.type){this.close();return}this._handleChunk(t);return}this.emit("data",t)}_handleChunk(e){let t=e.__peerData,n=this._chunkedData[t]||{data:[],count:0,total:e.total};if(n.data[e.n]=new Uint8Array(e.data),n.count++,this._chunkedData[t]=n,n.total===n.count){delete this._chunkedData[t];let e=function(e){let t=0;for(let n of e)t+=n.byteLength;let n=new Uint8Array(t),r=0;for(let t of e)n.set(t,r),r+=t.byteLength;return n}(n.data);this._handleDataMessage({data:e})}}_send(e,t){let n=o(e);if(n instanceof Promise)return this._send_blob(n);if(!t&&n.byteLength>this.chunker.chunkedMTU){this._sendChunks(n);return}this._bufferedSend(n)}async _send_blob(e){let t=await e;if(t.byteLength>this.chunker.chunkedMTU){this._sendChunks(t);return}this._bufferedSend(t)}_sendChunks(e){let t=this.chunker.chunk(e);for(let e of(eI.log(`DC#${this.connectionId} Try to send ${t.length} chunks...`),t))this.send(e,!0)}constructor(e,t,r){super(e,t,r),this.chunker=new n,this.serialization=I.Binary,this._chunkedData={}}}class eq extends eK{_handleDataMessage({data:e}){super.emit("data",e)}_send(e,t){this._bufferedSend(e)}constructor(...e){super(...e),this.serialization=I.None}}class eQ extends eK{_handleDataMessage({data:e}){let t=this.parse(this.decoder.decode(e)),n=t.__peerData;if(n&&"close"===n.type){this.close();return}this.emit("data",t)}_send(e,t){let n=this.encoder.encode(this.stringify(e));if(n.byteLength>=ex.chunkedMTU){this.emitError(x.MessageToBig,"Message too big for JSON channel");return}this._bufferedSend(n)}constructor(...e){super(...e),this.serialization=I.JSON,this.encoder=new TextEncoder,this.decoder=new TextDecoder,this.stringify=JSON.stringify,this.parse=JSON.parse}}class eZ extends eJ{get id(){return this._id}get options(){return this._options}get open(){return this._open}get socket(){return this._socket}get connections(){let e=Object.create(null);for(let[t,n]of this._connections)e[t]=n;return e}get destroyed(){return this._destroyed}get disconnected(){return this._disconnected}_createServerConnection(){let e=new eN(this._options.secure,this._options.host,this._options.port,this._options.path,this._options.key,this._options.pingInterval);return e.on(M.Message,e=>{this._handleMessage(e)}),e.on(M.Error,e=>{this._abort(E.SocketError,e)}),e.on(M.Disconnected,()=>{this.disconnected||(this.emitError(E.Network,"Lost connection to server."),this.disconnect())}),e.on(M.Close,()=>{this.disconnected||this._abort(E.SocketClosed,"Underlying socket is already closed.")}),e}_initialize(e){this._id=e,this.socket.start(e,this._options.token)}_handleMessage(e){let t=e.type,n=e.payload,r=e.src;switch(t){case O.Open:this._lastServerId=this.id,this._open=!0,this.emit("open",this.id);break;case O.Error:this._abort(E.ServerError,n.msg);break;case O.IdTaken:this._abort(E.UnavailableID,`ID "${this.id}" is taken`);break;case O.InvalidKey:this._abort(E.InvalidKey,`API KEY "${this._options.key}" is invalid`);break;case O.Leave:eI.log(`Received leave message from ${r}`),this._cleanupPeer(r),this._connections.delete(r);break;case O.Expire:this.emitError(E.PeerUnavailable,`Could not connect to peer ${r}`);break;case O.Offer:{let e=n.connectionId,t=this.getConnection(r,e);if(t&&(t.close(),eI.warn(`Offer received for existing Connection ID:${e}`)),n.type===w.Media){let i=new eW(r,this,{connectionId:e,_payload:n,metadata:n.metadata});t=i,this._addConnection(r,t),this.emit("call",i)}else if(n.type===w.Data){let i=new this._serializers[n.serialization](r,this,{connectionId:e,_payload:n,metadata:n.metadata,label:n.label,serialization:n.serialization,reliable:n.reliable});t=i,this._addConnection(r,t),this.emit("connection",i)}else{eI.warn(`Received malformed connection type:${n.type}`);return}for(let n of this._getMessages(e))t.handleMessage(n);break}default:{if(!n){eI.warn(`You received a malformed message from ${r} of type ${t}`);return}let i=n.connectionId,o=this.getConnection(r,i);o&&o.peerConnection?o.handleMessage(e):i?this._storeMessage(i,e):eI.warn("You received an unrecognized message:",e)}}}_storeMessage(e,t){this._lostMessages.has(e)||this._lostMessages.set(e,[]),this._lostMessages.get(e).push(t)}_getMessages(e){let t=this._lostMessages.get(e);return t?(this._lostMessages.delete(e),t):[]}connect(e,t={}){if(t={serialization:"default",...t},this.disconnected){eI.warn("You cannot connect to a new Peer because you called .disconnect() on this Peer and ended your connection with the server. You can create a new Peer to reconnect, or call reconnect on this peer if you believe its ID to still be available."),this.emitError(E.Disconnected,"Cannot connect to new Peer after disconnecting from server.");return}let n=new this._serializers[t.serialization](e,this,t);return this._addConnection(e,n),n}call(e,t,n={}){if(this.disconnected){eI.warn("You cannot connect to a new Peer because you called .disconnect() on this Peer and ended your connection with the server. You can create a new Peer to reconnect."),this.emitError(E.Disconnected,"Cannot connect to new Peer after disconnecting from server.");return}if(!t){eI.error("To call a peer, you must provide a stream from your browser's `getUserMedia`.");return}let r=new eW(e,this,{...n,_stream:t});return this._addConnection(e,r),r}_addConnection(e,t){eI.log(`add connection ${t.type}:${t.connectionId} to peerId:${e}`),this._connections.has(e)||this._connections.set(e,[]),this._connections.get(e).push(t)}_removeConnection(e){let t=this._connections.get(e.peer);if(t){let n=t.indexOf(e);-1!==n&&t.splice(n,1)}this._lostMessages.delete(e.connectionId)}getConnection(e,t){let n=this._connections.get(e);if(!n)return null;for(let e of n)if(e.connectionId===t)return e;return null}_delayedAbort(e,t){setTimeout(()=>{this._abort(e,t)},0)}_abort(e,t){eI.error("Aborting!"),this.emitError(e,t),this._lastServerId?this.disconnect():this.destroy()}destroy(){this.destroyed||(eI.log(`Destroy peer with ID:${this.id}`),this.disconnect(),this._cleanup(),this._destroyed=!0,this.emit("close"))}_cleanup(){for(let e of this._connections.keys())this._cleanupPeer(e),this._connections.delete(e);this.socket.removeAllListeners()}_cleanupPeer(e){let t=this._connections.get(e);if(t)for(let e of t)e.close()}disconnect(){if(this.disconnected)return;let e=this.id;eI.log(`Disconnect peer with ID:${e}`),this._disconnected=!0,this._open=!1,this.socket.close(),this._lastServerId=e,this._id=null,this.emit("disconnected",e)}reconnect(){if(this.disconnected&&!this.destroyed)eI.log(`Attempting reconnection to server with ID ${this._lastServerId}`),this._disconnected=!1,this._initialize(this._lastServerId);else if(this.destroyed)throw Error("This peer cannot reconnect to the server. It has already been destroyed.");else if(this.disconnected||this.open)throw Error(`Peer ${this.id} cannot reconnect because it is not disconnected from the server!`);else eI.error("In a hurry? We're still trying to make the initial connection!")}listAllPeers(e=e=>{}){this._api.listAllPeers().then(t=>e(t)).catch(e=>this._abort(E.ServerError,e))}constructor(e,t){let n;if(super(),this._serializers={raw:eq,json:eQ,binary:eX,"binary-utf8":eX,default:eX},this._id=null,this._lastServerId=null,this._destroyed=!1,this._disconnected=!1,this._open=!1,this._connections=new Map,this._lostMessages=new Map,e&&e.constructor==Object?t=e:e&&(n=e.toString()),t={debug:0,host:ex.CLOUD_HOST,port:ex.CLOUD_PORT,path:"/",key:eZ.DEFAULT_KEY,token:ex.randomToken(),config:ex.defaultConfig,referrerPolicy:"strict-origin-when-cross-origin",serializers:{},...t},this._options=t,this._serializers={...this._serializers,...this.options.serializers},"/"===this._options.host&&(this._options.host=window.location.hostname),this._options.path&&("/"!==this._options.path[0]&&(this._options.path="/"+this._options.path),"/"!==this._options.path[this._options.path.length-1]&&(this._options.path+="/")),void 0===this._options.secure&&this._options.host!==ex.CLOUD_HOST?this._options.secure=ex.isSecure():this._options.host==ex.CLOUD_HOST&&(this._options.secure=!0),this._options.logFunction&&eI.setLogFunction(this._options.logFunction),eI.logLevel=this._options.debug||0,this._api=new eH(t),this._socket=this._createServerConnection(),!ex.supports.audioVideo&&!ex.supports.data){this._delayedAbort(E.BrowserIncompatible,"The current browser does not support WebRTC");return}if(n&&!ex.validateId(n)){this._delayedAbort(E.InvalidID,`ID "${n}" is invalid`);return}n?this._initialize(n):this._api.retrieveId().then(e=>this._initialize(e)).catch(e=>this._abort(E.ServerError,e))}}eZ.DEFAULT_KEY="peerjs",window.peerjs={Peer:eZ,util:ex},window.Peer=eZ})();
+
+
+</script>
+<script>
+{
+const app=document.getElementById('app');
+const R={
+  mafia:{n:"Mafia",d:"Each night, agree with your fellow Mafia on someone to eliminate. You win when only Mafia are left."},
+  healer:{n:"Healer",d:"Each night, choose one person to protect. If the Mafia attack them, they survive."},
+  seer:{n:"Seer",d:"Each night, choose one person and learn their exact role."},
+  detective:{n:"Detective",d:"Each night, investigate one person and learn only whether they are Mafia or not. (The Fool reads as not Mafia.)"},
+  cupid:{n:"Cupid",d:"On the first night, choose two players to fall in love (it can be you). The lovers learn who each other are. If one dies, the other dies of a broken heart. If the lovers are on opposite sides and the last two alive, they win together."},
+  witch:{n:"Witch Doctor",d:"Each night, protect one person like the Healer. Once per game you can also use your poison to kill someone."},
+  hunter:{n:"Hunter",d:"If the town votes you out during the day, you take one person down with you."},
+  fool:{n:"Fool",d:"You win if the Mafia win, but you don't know who they are. Get the town to vote out the wrong people. The Seer sees you as a Peasant."},
+  shuffler:{n:"Shuffler",d:"Once per game, at night, swap the roles of two players. They wake up with each other's cards."},
+  drunk:{n:"Drunk",d:"Thinks they have a different role. Their powers do nothing and their visions are wrong. They never find out."},
+  peasant:{n:"Peasant",d:"No special power. Use your wits and your vote to find the Mafia."}
+};
+const ORDER=["mafia","healer","seer","detective","witch","hunter","cupid","fool","shuffler","drunk"];
+const SPECIAL=ORDER.filter(r=>r!=='mafia');
+const DRUNK_AS=["seer","detective","healer","witch","hunter","shuffler","cupid"];
+/* balance points: positive helps the town, negative helps the Mafia */
+const W={mafia:-6,peasant:1,seer:7,detective:5,healer:4,witch:5,hunter:3,cupid:-2,shuffler:-1,fool:-3,drunk:-2};
+const MODES={std:["Standard","You set exactly which roles are in the game, and everyone can see the list. Who gets which role is still random every game."],
+  rnd:["Random range","You pick a range for the Mafia and which roles might appear. The game deals a balanced mix. Nobody knows how many Mafia there are or which roles are in play."],
+  sp:["Everyone special","Every player gets a power, no Peasants. The game deals a balanced mix and keeps the line-up and the Mafia count secret."]};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rid=(n=8)=>Array.from({length:n},()=>'abcdefghjkmnpqrstuvwxyz23456789'[Math.random()*31|0]).join('');
+// Game codes are real, easy four-letter words.
+const CODE_WORDS='ABLE APEX AQUA ARCH ARIA ATOM AUNT AURA BABY BACK BAKE BALL BAND BANK BARN BASE BATH BEAD BEAK BEAM BEAN BEAR BEEF BELL BELT BEND BIKE BIRD BLUE BOAT BODY BOLD BOLT BONE BOOK BOOT BOWL BULB BUNS BUSY BUZZ BYTE CAFE CAKE CALM CAMP CANE CAPE CARD CART CASE CASH CAVE CELL CHAT CHEF CHIN CHIP CITY CLAM CLAP CLAY CLIP CLUB COAL COAT CODE COIN COLD COMB CONE COOK COOL COPY CORD CORE CORN COZY CRAB CREW CROW CUBE CURL CUTE DARK DART DASH DATE DAWN DECK DEER DESK DIAL DICE DISH DIVE DOCK DOME DOOR DOVE DRUM DUCK DUNE DUSK DUST EASY EAST ECHO EDGE EPIC EXIT FACE FACT FAIR FARM FAST FERN FILM FIRE FISH FIVE FLAG FLAT FLIP FLOW FOAM FOLK FONT FOOD FOOT FORK FORT FOUR FROG FUEL FULL FUZZ GAME GATE GEAR GIFT GLAD GLOW GLUE GOAT GOLD GOLF GOOD GRAY GRIN GRIP GROW HAIR HALF HALL HALO HAND HARP HAWK HAZE HEAT HELM HERB HERO HIGH HIKE HILL HINT HIVE HOLD HOME HONK HOOD HOOK HOOP HOPE HORN HOST HOUR HUGE ICON IDEA INCH INKY IRIS IRON ISLE ITEM JADE JAZZ JEEP JOKE JOLT JULY JUMP JUNE KALE KEEN KELP KEYS KICK KIND KING KITE KIWI KNEE KNIT KNOB KNOT LACE LADY LAKE LAMB LAMP LAND LANE LARK LAVA LAWN LEAF LENS LIME LINE LINK LION LIST LOAF LOFT LOGO LOOP LOUD LUCK LUTE LYNX MAIL MAKE MANE MANY MAPS MARK MASK MAST MATH MAZE MEAL MELT MENU MILD MILK MILL MINT MIST MOAT MODE MOLE MOON MOSS MOTH MULE MUSE NAIL NAME NAVY NEAR NEAT NECK NEST NEWS NEXT NICE NOON NOSE NOTE NOVA OAKS OATS OBOE OKAY ONYX OPAL OPEN ORCA OVAL OVEN OWLS PACK PAGE PALM PARK PART PATH PEAK PEAR PEAS PINE PINK PIPE PLAN PLAY PLUM POEM POET POLE POND PONY POOL PORT POSE POUR PUFF PUMA PURE QUIZ RACE RAFT RAIN RAMP RANK RARE RAYS READ REEF REST RICE RICH RIDE RING RIPE RISE ROAD ROAM ROBE ROCK ROLL ROOF ROOM ROOT ROPE ROSE RUBY RUNE RUSH RUST SAFE SAGE SAIL SALT SAND SAVE SEAL SEED SHIP SHOE SHOP SIGN SILK SING SIZE SKIP SLED SLOW SNOW SOAP SOCK SOFA SOFT SOIL SOLO SONG SOUP SPIN STAR STEM STEP SUIT SURF SWAN SWIM TACO TAIL TALE TALL TAPE TART TASK TEAL TEAM TENT TIDE TIDY TILE TIME TINY TOAD TOFU TONE TOOL TOUR TOWN TREE TRIP TUBA TUNA TUNE TWIN TYPE UNIT VASE VAST VERB VEST VIEW VINE VOLT VOTE WADE WAKE WALK WALL WAND WARM WAVE WEEK WELL WEST WIND WING WINK WISE WISH WOLF WOOD WOOL WORD WORK WRAP YAKS YARD YARN YEAR YELL YOGA YOLK ZANY ZERO ZINC ZONE ZOOM'.split(' ');
+const newCode=()=>window.MAFIA_TEST_CODE||CODE_WORDS[Math.random()*CODE_WORDS.length|0];
+let freshGame=0;   // when this phone created a brand-new game (to clear leftovers of an old game with the same word)
+const ld=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const pick=a=>a[Math.random()*a.length|0];
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+
+let me=ld('mf_me',null)||{i:rid(),n:'',code:'',host:false};
+const saveMe=()=>{if(!ui.practice)sv('mf_me',me)};
+let G=null,net=null,conn=false,players={},acts={},lastHtml='',lastSent='',err='',toastT=null;
+let ui={pc:{nf:0,ng:20,nr:null,nc:0,nt:0,ah:0,sg:0,gh:0,gr:null,fp:1},exA:'healer',exB:'witch',bots:7,pmode:'std',prole:'random',practice:false,voteMe:false,peek:false,scr:'home',mode:'join',name:me.n,code:'',t:null,k:null,v:null,sw:[],lv:[],kill:false,showRole:false,sure:''};
+let st={i:me.i,n:me.n};
+let pinged=ld('mf_ping',''),lastRd='',notes=[],off=0,lastH=0;
+const hostNow=()=>Date.now()+(me.host?0:off);
+
+/* ---------- sound ---------- */
+let ac=null;
+let wl=null;
+function wake(){try{if(ui.scr==='game'&&navigator.wakeLock&&(!wl||wl.released))navigator.wakeLock.request('screen').then(l=>wl=l,()=>{})}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wake()});
+function unlock(){wake();try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state!=='running')ac.resume().then(render,()=>{})}catch(e){}}
+function ping(){}
+
+/* ---------- game helpers ---------- */
+const role=i=>G&&G.ro&&G.ro[i]?G.ro[i][0]:null;
+const shown=i=>G&&G.ro&&G.ro[i]?G.ro[i][1]:null;
+const alive=()=>G.pl.filter(p=>p.a).map(p=>p.i);
+const isAlive=i=>G.pl.some(p=>p.i===i&&p.a);
+const nm=i=>i==='-'?'Skip (no one)':((G.pl||[]).concat(G.lob||[]).find(p=>p.i===i)||{}).n||'Someone';
+const mine=()=>G&&G.pl?G.pl.find(p=>p.i===me.i):null;
+const act=i=>{const s=acts[i];return s&&s.act&&s.act.rd===G.rd?s.act:null};
+const vote=i=>{const s=acts[i];return s&&s.vote&&s.vote.rd===G.rd?s.vote:null};
+const partner=i=>G.lv&&G.lv.includes(i)?(G.lv[0]===i?G.lv[1]:G.lv[0]):null;
+function kill(i){const p=G.pl.find(p=>p.i===i);if(!p||!p.a)return;p.a=0;
+  if(G.gh&&Math.random()*100<ghostPct(G,role(i)))(G.gs=G.gs||{})[i]={v:1};   // Buff: chance to come back as a ghost with one vote
+  const o=partner(i);if(o&&isAlive(o)){G.hb=(G.hb||[]).concat(o);kill(o)}}
+const ghost=i=>G&&G.gs&&G.gs[i]?G.gs[i]:null;
+/* Alternating healer (Nerf mode): who this Healer / Witch Doctor protected last night, if that's off limits tonight */
+const blocked=i=>G&&G.nf&&G.ah&&G.lp?G.lp[i]||null:null;
+const team=i=>role(i)==='mafia'||role(i)==='fool'?'m':'v';
+const NERFABLE=['mafia','healer','seer','detective','witch','hunter','cupid','shuffler'];
+const NERF_DEF=()=>({});
+/* Nerf mode: true when this player's power fails this time */
+/* global chance for every role, unless that role has its own level (10-50%) */
+const ownLvl=(o,k)=>{const v=(o.nr||{})[k];return typeof v==='number'?v:null};
+/* Ghosts buff: each role can have its own chance to come back as a ghost; otherwise 50% */
+const GHOSTABLE=ORDER.concat('peasant');
+const GUESSABLE=ORDER.concat('peasant');   // roles a Guessing Seer can guess
+const seerGuess=()=>G&&G.nf&&G.sg;
+/* Role tweak: the Fool shows up as a Peasant to the Seer (not to the Detective) */
+const seerSees=i=>{const r=role(i);return r==='fool'?'peasant':r};   // always on
+const ownGh=(o,k)=>{const v=(o.gr||{})[k];return typeof v==='number'?v:null};
+const ghostPct=(o,k)=>{const v=ownGh(o,k);return v===null?50:v};
+const nfPct=(o,k)=>{if(!o||!o.nf||!NERFABLE.includes(k))return 0;const v=ownLvl(o,k);return v!==null?v:(o.ng||0)};
+const fails=i=>{const p=nfPct(G,role(i));return !!(p&&Math.random()*100<p)};
+const allDone=()=>G.tot>0&&G.done>=G.tot;
+function suggest(n){return{mafia:Math.max(1,Math.floor(n/4)),seer:n>=4?1:0,healer:n>=5?1:0,hunter:n>=6?1:0,detective:n>=7?1:0,witch:n>=8?1:0,fool:n>=9?1:0,cupid:n>=10?1:0,shuffler:n>=11?1:0,drunk:n>=12?1:0}}
+const setup=()=>G.setup||suggest(G.lob.length);
+const maxMafia=n=>Math.max(1,Math.floor((n-1)/2));
+function rng(n){const r=G.rng||[1,Math.max(1,Math.round(n/3.5))],mx=Math.min(maxMafia(n),Math.max(1,r[1]));return[Math.min(Math.max(1,r[0]),mx),mx]}
+const spRange=n=>{const mx=Math.min(maxMafia(n),Math.max(1,Math.ceil(n/3.5)));return[Math.min(mx,Math.max(1,Math.floor(n/5))),mx]};
+const poolOn=()=>SPECIAL.filter(r=>!G.pool||G.pool[r]!==0);
+const poolMust=()=>SPECIAL.filter(r=>G.pool&&G.pool[r]===2);   // "Always": guaranteed in the game
+/* deal a balanced random deck: try many line-ups, keep the fair ones, pick one at random */
+function gen(n,mode,mn,mx,pool,must,ex){
+  must=must||[];ex=ex||[];
+  const clash=d=>ex.some(([a,b])=>d.includes(a)&&d.includes(b));
+  const maybe=pool.filter(r=>!must.includes(r));
+  const ok=[];let best=null,bs=1e9;
+  for(let t=0;t<900;t++){
+    const m=mn+(Math.random()*(mx-mn+1)|0),slots=n-m;
+    if(must.length>slots)continue;
+    const sp=must.concat(shuf(maybe.slice()));
+    const lo=mode==='sp'?slots:must.length,hi=mode==='sp'?slots:Math.min(sp.length,slots);
+    const k=lo+(Math.random()*(hi-lo+1)|0);
+    const d=Array(m).fill('mafia');
+    for(let j=0;j<slots;j++)d.push(j<k?(j<sp.length?sp[j]:pick(['healer','hunter','detective','seer'])):'peasant');
+    if(clash(d))continue;                          // two roles that must never be together
+    const s=Math.abs(d.reduce((a,r)=>a+W[r],0));
+    if(s<=2)ok.push(d);if(s<bs){bs=s;best=d}
+  }
+  return ok.length?pick(ok):best;                  // null if no line-up fits the rules
+}
+function compText(){
+  if(!G.mode||G.mode==='std'){const c={};Object.values(G.ro).forEach(r=>c[r[0]]=(c[r[0]]||0)+1);
+    return 'Roles in this game: '+ORDER.concat('peasant').filter(k=>c[k]).map(k=>(c[k]>1?c[k]+' × ':'')+R[k].n).join(', ')+'.'}
+  return `Mafia: somewhere between ${G.info[0]} and ${G.info[1]}. `+(G.mode==='sp'?'Everyone has a power; the line-up is secret.':'The other roles in play are secret.');
+}
+function top(c){let m=0,t=[];for(const k in c){if(c[k]>m){m=c[k];t=[k]}else if(c[k]===m)t.push(k)}return t}
+
+/* ---------- host logic ---------- */
+function hostTick(){
+  if(!G)return;
+  players[me.i]=st;
+  for(const k in players){const s=players[k];if(s&&s.i)acts[s.i]=s}
+  const g=G;
+  if(g.ph==='lobby'){g.lob=Object.values(players).filter(s=>s&&s.n).map(s=>({i:s.i,n:fullName(s)}));rnClean()}
+  else if(g.ph==='night'){
+    const al=alive(),mafs=al.filter(i=>role(i)==='mafia');let d=0;
+    g.mp={};g.mc={};g.ms={};g.agp=null;g.cb=null;
+    mafs.forEach(i=>{const s=acts[i],a=act(i);if(s&&s.mp&&s.mp.rd===g.rd&&s.mp.t&&isAlive(s.mp.t))g.ms[i]={t:s.mp.t,at:s.mp.at||0};
+      const t=(g.ms[i]&&g.ms[i].t)||(a&&a.t);if(t)g.mp[i]=t;if(a&&a.t)g.mc[i]=1});
+    if(mafs.length===1){const a=act(mafs[0]);g.ag=a&&a.t?a.t:null}
+    else{/* everyone has suggested or agreed to the same person, then one of them confirms */
+      const tg=mafs.map(i=>g.ms[i]&&g.ms[i].t);
+      g.agp=mafs.length&&tg.every(x=>x)&&new Set(tg).size===1?tg[0]:null;
+      const cb=g.agp?mafs.find(i=>act(i)&&act(i).t===g.agp):null;
+      g.ag=cb?g.agp:null;g.cb=cb||null;
+    }
+    if(g.ag)d+=mafs.length;
+    al.forEach(i=>{const a=act(i);if(!a||role(i)==='mafia')return;d++;
+      const sh=shown(i);
+      if((sh==='seer'||sh==='detective')&&a.t&&a.t!=='-'&&!(g.sr[i]&&g.sr[i].rd===g.rd)){
+        const real=role(i)===sh;let r;const fl=real&&fails(i);
+        if(sh==='seer'&&g.nf&&g.sg&&a.g){            // Guessing Seer: only learns whether the guess was right
+          const right=real?seerSees(a.t)===a.g:Math.random()<1/3;r=(right?'Y:':'W:')+a.g}
+        else if(sh==='seer')r=real?seerSees(a.t):pick(Object.keys(R).filter(r=>r!=='drunk'));
+        else r=real?(role(a.t)==='mafia'?'M':'N'):pick(['M','N']);
+        if(fl)r='X';g.sr[i]={rd:g.rd,n:g.dn+1,t:a.t,r};
+      }});
+    g.tot=al.length;g.done=g.to?al.length:d;
+  }
+  else if(g.ph==='day'){const al=alive();g.done=al.filter(i=>vote(i)).length;g.tot=al.length}
+  else if(g.ph==='hunter'){
+    const s=acts[g.hp];
+    if(s&&s.shot&&s.shot.rd===g.rd&&s.shot.t&&(s.shot.t==='-'||isAlive(s.shot.t))){const no=s.shot.t==='-',fl=!no&&fails(g.hp);if(!no&&!fl)kill(s.shot.t);g.shot={h:g.hp,t:no||fl?null:s.shot.t,f:fl?1:0,aim:fl?s.shot.t:null};g.ph='dusk';g.rd=rid();checkWin()}
+  }
+  if(!ui.practice){sv('mf_G',G);sv('mf_acts',acts)}
+  sendNet();botsTick();
+}
+function startGame(){
+  const lob=G.lob,n=lob.length,mode=G.mode||'std';let deck=[];
+  if(n<4)return toast('You need at least 4 players.');
+  if(mode==='std'){const c=setup();
+    if(!c.mafia)return toast('You need at least one Mafia.');
+    ORDER.forEach(k=>{for(let j=0;j<(c[k]||0);j++)deck.push(k)});
+    if(deck.length>n)return toast('More special roles than players.');
+    while(deck.length<n)deck.push('peasant');G.setup=c;
+  }else{
+    G.info=mode==='sp'?spRange(n):rng(n);
+    const pool=mode==='sp'?SPECIAL:poolOn();
+    deck=mode==='rnd'?gen(n,mode,G.info[0],G.info[1],pool,poolMust(),G.ex):gen(n,mode,G.info[0],G.info[1],pool);
+    if(!deck)return toast("Couldn't deal a line-up that fits your rules. Allow more roles, or remove a rule.");
+  }
+  shuf(deck);
+  G.gid=rid();G.lv=null;G.hb=[];G.pl=lob.map(p=>({i:p.i,n:p.n,a:1}));G.ro={};
+  G.pl.forEach((p,k)=>{const r=deck[k];G.ro[p.i]=[r,r==='drunk'?pick(DRUNK_AS):r]});
+  Object.assign(G,{pu:{},su:{},sr:{},msg:{},dead:[],out:null,shot:null,win:null,early:null,dn:0,last:null,gs:{},lp:{}});
+  toNight();
+}
+function toNight(){G.ph='night';G.rd=rid();G.mp={};G.mc={};G.ag=null;G.to=0;G.t0=G.hnow=Date.now();G.done=0;G.tot=alive().length}
+function resolveNight(){
+  const g=G,al=alive(),dead=new Set(),healed=new Set(),picks={};
+  g.msg={};g.hb=[];
+  const say=(p,m)=>{(g.msg[p]=g.msg[p]||[]).push(m)};
+  if(g.dn===0)al.forEach(i=>{const a=act(i);if(a&&a.lv&&shown(i)==='cupid'&&role(i)==='cupid'&&!g.lv){
+    if(fails(i)){say(i,'Your arrow missed (Nerf mode). No one fell in love.');return}
+    const [x,y]=a.lv;if(x&&y&&x!==y&&isAlive(x)&&isAlive(y)){g.lv=[x,y];
+      say(x,`Cupid's arrow struck! You are in love with ${nm(y)}. If they die, you die of a broken heart.`);
+      say(y,`Cupid's arrow struck! You are in love with ${nm(x)}. If they die, you die of a broken heart.`)}}});
+  al.forEach(i=>{const t=role(i)==='mafia'&&g.mp&&g.mp[i];if(t&&isAlive(t))picks[t]=(picks[t]||0)+1});
+  al.forEach(i=>{const a=act(i);if(!a)return;
+    if((role(i)==='healer'||role(i)==='witch')&&a.t&&a.t!=='-'){
+      if(blocked(i)&&blocked(i)===a.t)say(i,"You can't protect the same person two nights in a row, so your protection did nothing.");
+      else if(fails(i))say(i,'Your protection failed last night (Nerf mode).');else healed.add(a.t)}});
+  const t=top(picks);let target=t.length?pick(t):null;
+  const mf=al.filter(i=>role(i)==='mafia');
+  if(target&&mf.length&&fails(mf[0])){target=null;mf.forEach(i=>say(i,'Your kill failed last night (Nerf mode). No one was attacked.'))}
+  if(target&&!healed.has(target))dead.add(target);
+  al.forEach(i=>{const a=act(i);if(a&&a.k&&shown(i)==='witch'&&!g.pu[i]){g.pu[i]=1;if(role(i)==='witch'&&isAlive(a.k)){if(fails(i))say(i,'Your poison failed (Nerf mode). It is used up.');else dead.add(a.k)}}});
+  al.forEach(i=>{const a=act(i);if(a&&a.sw&&shown(i)==='shuffler'&&!g.su[i]){g.su[i]=1;
+    const [x,y]=a.sw;
+    if(role(i)==='shuffler'&&x&&y&&x!==y&&fails(i)){say(i,'Your shuffle failed (Nerf mode). It is used up.')}
+    else if(role(i)==='shuffler'&&x&&y&&x!==y&&isAlive(x)&&isAlive(y)&&!dead.has(x)&&!dead.has(y)){
+      [g.ro[x],g.ro[y]]=[g.ro[y],g.ro[x]];
+      [g.pu[x],g.pu[y]]=[g.pu[y]||0,g.pu[x]||0];[g.su[x],g.su[y]]=[g.su[y]||0,g.su[x]||0];
+      [x,y].forEach(p=>say(p,`While you slept, your role card was swapped. You are now the ${R[g.ro[p][1]].n}.`));
+    }}});
+  // Alternating healer: remember tonight's pick, so it's off limits next night
+  if(g.nf&&g.ah){g.lp=g.lp||{};al.forEach(i=>{const sh=shown(i);if(sh==='healer'||sh==='witch'){const a=act(i);g.lp[i]=a&&a.t&&a.t!=='-'?a.t:null}})}
+  dead.forEach(kill);
+  g.dead=[...dead];g.out=null;g.shot=null;g.last='night';g.dn++;g.ph='morning';g.rd=rid();
+  checkWin();
+}
+function resolveVote(){
+  const c={},vb={},nv=[];alive().forEach(i=>{const v=vote(i);if(v&&v.t){c[v.t]=(c[v.t]||0)+1;(vb[v.t]=vb[v.t]||[]).push(i)}else nv.push(i)});
+  const gv=[];                                     // ghosts who used their one ghost vote today
+  Object.keys(G.gs||{}).forEach(i=>{const g=G.gs[i];if(!g.v||isAlive(i))return;const v=vote(i);
+    if(v&&v.t&&v.t!=='-'&&isAlive(v.t)){c[v.t]=(c[v.t]||0)+1;(vb[v.t]=vb[v.t]||[]).push(i);g.v=0;gv.push(i)}});
+  const t=top(c),out=t.length===1&&t[0]!=='-'?t[0]:null;
+  G.out={p:out,c,vb,nv,gv};G.shot=null;G.last='day';G.hb=[];
+  if(out){kill(out);if(role(out)==='hunter'){G.ph='hunter';G.hp=out;G.rd=rid();return}}
+  G.ph='dusk';G.rd=rid();checkWin();
+}
+function checkWin(){
+  const al=alive(),m=al.filter(i=>role(i)==='mafia').length;
+  if(G.lv&&al.length===2&&al.includes(G.lv[0])&&al.includes(G.lv[1])&&team(G.lv[0])!==team(G.lv[1]))G.win='l';
+  else if(m===0)G.win='v';else if(al.every(i=>role(i)==='mafia'||role(i)==='fool'))G.win='m';
+  if(!G.win&&!G.ne){const e=settled();if(e){G.win=e[0];G.early=e[1]}}
+  if(G.win)G.ph='over';
+}
+/* "End the game when the result is certain" (on unless the guide turns it off, G.ne=1).
+   Returns [winner, reason] when nothing can change the outcome any more, otherwise null.
+   The Mafia know each other and always vote together; the town might not, so the town only
+   wins early when it truly can't fail. */
+function settled(){
+  const al=alive(),M=al.filter(i=>role(i)==='mafia'),T=al.filter(i=>role(i)!=='mafia');
+  if(!M.length)return null;
+  const ghostVotes=Object.keys(G.gs||{}).filter(i=>G.gs[i]&&G.gs[i].v&&!isAlive(i)&&role(i)!=='mafia').length;
+  const lovers=G.lv&&G.lv.every(isAlive)&&team(G.lv[0])!==team(G.lv[1]);
+  // roles that could still turn the game around
+  const changer=i=>{const r=role(i);return r==='healer'||r==='witch'||r==='hunter'||(r==='shuffler'&&!G.su[i])};
+  if(lovers)return null;
+  // The Mafia have at least as many votes as everyone else (ghost votes included), so nobody
+  // can vote them out, and every night they remove one more person.
+  if(!T.some(changer)&&M.length>=T.length+ghostVotes)return['m','mafia'];
+  if(M.length===1&&T.length===1&&!ghostVotes){
+    const h=T[0],r=role(h);
+    // The last Witch Doctor still has poison and knows exactly who the Mafia is
+    if(r==='witch'&&!G.pu[h]&&!nfPct(G,'witch'))return['v','poison'];
+    // The last Healer or Witch Doctor can protect themselves every night, and the vote always ties
+    if((r==='healer'||r==='witch')&&!(G.nf&&G.ah)&&!nfPct(G,r)&&!nfPct(G,'mafia'))return['d','stalemate'];
+  }
+  return null;
+}
+
+/* ---------- practice mode: computer players on one phone ---------- */
+const BOTS=['Ava','Ben','Cleo','Dev','Eli','Fern','Gus','Hana','Ivan','Jade','Kai','Lu','Moe','Nia'];
+let botRd='';
+function botMafia(){
+  if(!ui.practice||!G||G.ph!=='night'||G.ag)return;
+  const mafs=alive().filter(i=>role(i)==='mafia'),bots=mafs.filter(i=>i.startsWith('bot'));
+  if(!bots.length||mafs.length<2)return;
+  const key=G.rd+JSON.stringify(G.ms||{})+G.agp;if(ui.bmk===key)return;ui.bmk=key;const rd=G.rd;
+  setTimeout(()=>{if(!G||G.rd!==rd||G.ag)return;
+    const ms=G.ms||{};let L=null;for(const k in ms)if(!L||ms[k].at>L.at)L={by:k,t:ms[k].t,at:ms[k].at};
+    const put=(b,o)=>{players[b]=Object.assign({},players[b],o)};
+    if(!L){const t=pick(alive().filter(i=>role(i)!=='mafia'));put(bots[0],{mp:{rd,t,at:Date.now()}})}
+    else bots.forEach(b=>{if(!ms[b]||ms[b].t!==L.t)put(b,{mp:{rd,t:L.t,at:L.at},act:null})});
+    hostTick();
+    if(G.agp&&!G.ag&&!mafs.includes(me.i)){put(bots[0],{act:{rd,t:G.agp}});hostTick()}
+    onGame();render();
+  },1800);
+}
+function botsTick(){
+  botMafia();
+  if(!ui.practice||!G||G.rd===botRd)return;botRd=G.rd;const rd=G.rd;
+  const bots=Object.keys(players).filter(k=>k.startsWith('bot'));
+  const later=fn=>setTimeout(()=>{if(G&&G.rd===rd){fn();hostTick();onGame();render()}},800+Math.random()*3200);
+  const oth=i=>alive().filter(x=>x!==i);
+  const put=(b,o)=>{players[b]=Object.assign({},players[b],o)};
+  if(G.ph==='night')bots.filter(isAlive).forEach(b=>later(()=>{
+    const s=shown(b),o=oth(b),A=alive(),x={rd};
+    if(s==='mafia'&&alive().filter(i=>role(i)==='mafia').length>1)return;
+    if(s==='mafia'){const t=A.filter(i=>role(i)!=='mafia'),tp=[G.mp&&G.mp[me.i]].concat(Object.keys(G.mp||{}).filter(k=>k!==b).map(k=>G.mp[k])).filter(v=>v&&isAlive(v));x.t=tp.length?tp[0]:pick(t.length?t:o);put(b,{mp:{rd,t:x.t}})}
+    else if(s==='seer'){x.t=pick(o);if(seerGuess())x.g=pick(GUESSABLE)}
+    else if(s==='healer')x.t=pick(A.filter(i=>i!==blocked(b)));
+    else if(s==='witch'){x.t=pick(A.filter(i=>i!==blocked(b)));if(!G.pu[b]&&Math.random()<.25)x.k=pick(o)}
+    else if(s==='cupid'&&G.dn===0){x.t='-';x.lv=shuf(A.slice()).slice(0,2)}
+    else if(s==='shuffler'&&!G.su[b]){x.t='-';if(Math.random()<.35)x.sw=shuf(A.slice()).slice(0,2)}
+    else x.t=pick(o);
+    put(b,{act:x})}));
+  else if(G.ph==='day'){bots.filter(isAlive).forEach(b=>later(()=>{
+    const t=ui.voteMe&&isAlive(me.i)?me.i:(Math.random()<.15?'-':pick(oth(b)));put(b,{vote:{rd,t}})}));
+    bots.filter(b=>!isAlive(b)&&ghost(b)&&ghost(b).v&&Math.random()<.4).forEach(b=>later(()=>put(b,{vote:{rd,t:pick(alive())}})))}
+  else if(G.ph==='hunter'&&G.hp.startsWith('bot'))later(()=>put(G.hp,{shot:{rd,t:pick(alive())}}));
+}
+function startPractice(){
+  ui.realMe=me;ui.practice=true;me={i:'you',n:(ui.name||'').trim().slice(0,16)||'Player 1',code:'TEST',host:true};
+  st={i:me.i,n:me.n};players={};acts={};net=null;conn=true;botRd='';
+  players[me.i]=st;for(let j=0;j<ui.bots;j++){const id='bot'+j;players[id]={i:id,n:BOTS[j]}}
+  G={ph:'lobby',code:'TEST',mode:ui.pmode,setup:null,rev:1,lob:[],rd:rid(),dn:0,nf:ui.pc.nf,ng:ui.pc.ng,nr:ui.pc.nr,nc:ui.pc.nc,nt:ui.pc.nt,ne:ui.pc.ne,ah:ui.pc.ah,sg:ui.pc.sg,gh:ui.pc.gh,gr:ui.pc.gr,fp:ui.pc.fp};
+  hostTick();startGame();if(ui.prole!=='random')setMyRole(ui.prole);
+  ui.scr='game';ui.showRole=true;hostTick();onGame();
+}
+function testDie(asGhost){
+  const p=mine();if(!p||!G||G.ph==='lobby')return;
+  p.a=0;G.gs=G.gs||{};if(asGhost)G.gs[me.i]={v:1};else delete G.gs[me.i];
+  G.dead=[me.i];G.hb=[];G.out=null;G.shot=null;G.last='night';G.dn=Math.max(1,G.dn);G.msg={};
+  G.ph='morning';G.rd=rid();ui.ptOpen=false;
+}
+function setMyRole(r){
+  const o=G.pl.find(p=>p.i!==me.i&&role(p.i)===r);
+  if(o)[G.ro[me.i],G.ro[o.i]]=[G.ro[o.i],G.ro[me.i]];else G.ro[me.i]=[r,r==='drunk'?pick(DRUNK_AS):r];
+  st.act=null;ui.t=ui.k=ui.g=null;ui.sw=[];ui.lv=[];ui.kill=false;ui.showRole=true;
+}
+function practiceV(){
+  const opts=['random'].concat(ORDER,'peasant');
+  return `<button class="link" data-a="home">← Back</button><h2>Practice mode</h2>
+<p>Play a full game alone on this phone. The other seats are computer players who make their moves a few seconds after you. You're also the guide, so you see the guide's buttons too.</p>
+${card(`<label for="nm">Your name</label><input id="nm" maxlength="16" value="${esc(ui.name)}">`+stepRow('Computer players',ui.bots,'pbots','x')+
+`<p style="margin-top:14px"><b>Play style</b></p><div class="list">${Object.keys(MODES).map(k=>`<button class="opt${k===ui.pmode?' sel':''}" data-a="pmode" data-r="${k}"><span>${MODES[k][0]}</span><small>${k===ui.pmode?'Selected':''}</small></button>`).join('')}</div>
+<p style="margin-top:14px"><b>Your role</b> <span class="mut">(you can change it any time during practice)</span></p><div class="list">${opts.map(k=>`<button class="opt${k===ui.prole?' sel':''}" data-a="prole" data-r="${k}"><span>${k==='random'?'Random':R[k].n}</span><small>${k===ui.prole?'Selected':''}</small></button>`).join('')}</div>`)}
+${settingsV(ui.pc,'p')}<button class="pri big" data-a="pstart">Start practice</button>`;
+}
+function practiceTools(){
+  if(!ui.practice||!G.ro)return '';
+  const t=role(me.i),s=shown(me.i);
+  return `<details id="pt" class="card guide" style="margin-top:0"${ui.ptOpen?' open':''}><summary>Practice tools${t==='drunk'?' · you are secretly the Drunk':''}</summary>
+<p class="mut">Switch your role to try its screen. Your current choice resets.</p>
+<div class="list">${ORDER.concat('peasant').map(k=>`<button class="opt${k===t?' sel':''}" data-a="myrole" data-r="${k}"><span>${R[k].n}</span><small>${k===t?'You':''}</small></button>`).join('')}</div>
+${mine()&&!mine().a?'<button class="pri" data-a="revive">Bring me back to life</button>':'<button data-a="tdie">Die now (see the death screen)</button><button data-a="tghost">Die as a ghost</button>'}
+<button class="opt" data-a="voteme"><span>Computer players all vote for me (try the Hunter)</span><small>${ui.voteMe?'On':'Off'}</small></button>
+<button class="opt" data-a="peek"><span>Show everyone's roles</span><small>${ui.peek?'On':'Off'}</small></button>
+${ui.peek?rolesList():''}
+<button data-a="pexit">Exit practice</button></details>`;
+}
+
+/* ---------- network ---------- */
+function sendNet(){
+  if(!net)return;
+  const s=JSON.stringify([st,me.host?G:0]);
+  if(s===lastSent)return;lastSent=s;net.send();
+}
+function push(){if(!ui.practice)sv('mf_st',st);if(me.host)hostTick();else sendNet();onGame();render()}
+function onNet(map,g){
+  if(me.host){if(map)players=map;hostTick()}
+  else if(g){G=g}
+  onGame();render();
+}
+function onGame(){
+  if(!G)return;
+  if(!me.host&&!ui.practice&&G.kk&&G.kk.includes(me.i)&&me.code){try{sessionStorage.setItem('mf_kicked',JSON.stringify({c:G.code||me.code,n:me.n}))}catch(e){}leave();return}
+  if(!me.host&&G.hnow&&G.hnow!==lastH){lastH=G.hnow;off=G.hnow-Date.now()}
+  if(G.rd!==lastRd){lastRd=G.rd;ui.ptOpen=false;ui.showRole=false;ui.seeAll=false;ui.comp=false;ui.t=ui.k=ui.v=ui.g=null;ui.cf=null;ui.sw=[];ui.lv=[];ui.kill=false;ui.sure=''}
+  if(G.gid){
+    notes=ld('mf_n_'+G.gid,[]);
+    const s=G.sr&&G.sr[me.i];
+    if(s&&!notes.some(n=>n.rd===s.rd)){notes.push({rd:s.rd,n:s.n,name:nm(s.t),r:s.r});sv('mf_n_'+G.gid,notes)}
+  }
+  
+}
+function setConn(c){conn=c;if(c)err='';render()}
+function fail(m){err=m;render()}
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+
+async function connect(){
+  setTimeout(()=>{if(!conn&&!G)fail("Still can't reach the game. Check the code, and that the guide's phone has this page open.")},15000);
+  let room=null;
+  if(window.claude&&typeof window.claude.use==='function'){try{room=await window.claude.use('room')}catch(e){}}
+  if(room){
+    try{const r=await room.join('mafia-'+me.code.toLowerCase());net=roomNet(r);sendNet();return}catch(e){}
+  }
+  try{net=mixNet();lastSent='';sendNet()}catch(e){fail("This page couldn't open a live connection here. Check your internet connection and try again.")}
+}
+function roomNet(r){
+  const n={send(){r.presence(me.host?{s:st,g:G}:{s:st,g:null}).catch(()=>{})}};
+  r.onPeers(ch=>{const map={};let g=null;
+    ch.peers.forEach(p=>{const pr=p.presence||{};if(pr.s&&pr.s.i)map[pr.s.i]=pr.s;if(pr.g&&!p.sameTab)g=pr.g});
+    onNet(map,g)});
+  r.onConnection(setConn,()=>setConn(false));
+  return n;
+}
+/* ---------- network: two relays + a direct link ----------
+   Every message goes three ways at once: through two public relay servers (MQTT over secure
+   WebSocket, which works on any Wi-Fi or mobile network, like loading a web page) and over a
+   direct PeerJS link when the networks allow one. Whichever copy arrives first counts; messages
+   are numbered, so the extra copies are ignored. */
+// Four free public relays run by four different organisations. The last two use the normal
+// web port (443), so they also get through strict Wi-Fi that blocks the first two.
+const RELAYS=(window.MAFIA_RELAYS||[
+  {name:'HiveMQ',url:'wss://broker.hivemq.com:8884/mqtt'},
+  {name:'EMQX',url:'wss://broker.emqx.io:8084/mqtt'},
+  {name:'Eclipse',url:'wss://mqtt.eclipseprojects.io/mqtt'},
+  {name:'shiftr.io',url:'wss://public.cloud.shiftr.io/',user:'public',pass:'public'}
+]).map(r=>typeof r==='string'?{url:r}:r);
+const te8=new TextEncoder(),td8=new TextDecoder();
+function cat(a){let n=0;for(const p of a)n+=p.length;const o=new Uint8Array(n);let k=0;for(const p of a){o.set(p,k);k+=p.length}return o}
+const u16=n=>new Uint8Array([n>>8&255,n&255]);
+const mstr=s=>{const b=te8.encode(s);return cat([u16(b.length),b])};
+const vlen=n=>{const o=[];do{let d=n%128;n=Math.floor(n/128);if(n>0)d|=128;o.push(d)}while(n>0);return new Uint8Array(o)};
+const mpkt=(h,b)=>cat([new Uint8Array([h]),vlen(b.length),b]);
+
+/* A small MQTT 3.1.1 client: connect, subscribe, publish (QoS 0, optionally retained),
+   a "last will" message, keep-alive, and reconnecting after sleep or network changes. */
+function miniMqtt(relay,o){
+  const url=relay.url;
+  let ws=null,buf=new Uint8Array(0),up=false,timer=null,retry=1500,pid=1,lastRx=0,closed=false;
+  const put=b=>{try{if(ws&&ws.readyState===1)ws.send(b)}catch(e){}};
+  const subPkt=()=>mpkt(0x82,cat([u16(pid++),...o.subs.map(s=>cat([mstr(s),new Uint8Array([0])]))]));
+  const connectPkt=()=>mpkt(0x10,cat([mstr('MQTT'),
+    new Uint8Array([4,2|(o.will?4|32:0)|(relay.user!=null?128:0)|(relay.pass!=null?64:0)]),u16(30),mstr(o.id),
+    ...(o.will?[mstr(o.will),u16(0)]:[]),
+    ...(relay.user!=null?[mstr(relay.user)]:[]),...(relay.pass!=null?[mstr(relay.pass)]:[])]));
+  function onData(d){
+    lastRx=Date.now();
+    buf=cat([buf,new Uint8Array(d)]);
+    for(;;){
+      if(buf.length<2)return;
+      let i=1,v=0,m=1,b;
+      do{if(i>=buf.length)return;b=buf[i++];v+=(b&127)*m;m*=128}while(b&128);
+      if(buf.length<i+v)return;
+      const h=buf[0],body=buf.slice(i,i+v);buf=buf.slice(i+v);
+      const t=h>>4;
+      if(t===2){                                   // CONNACK
+        if(body[1]!==0){try{ws.close()}catch(e){}return}
+        up=true;retry=1500;
+        put(subPkt());
+        o.onUp();
+      }else if(t===3){                             // PUBLISH
+        const tl=body[0]<<8|body[1];let k=2+tl;if((h>>1)&3)k+=2;
+        o.onMsg(td8.decode(body.subarray(2,2+tl)),td8.decode(body.subarray(k)),(h&1)===1);
+      }
+    }
+  }
+  function later(){clearTimeout(timer);timer=setTimeout(open,retry);retry=Math.min(retry*2,15000)}
+  function open(){
+    clearTimeout(timer);if(closed)return;
+    let w;try{w=ws=new WebSocket(url,['mqtt'])}catch(e){ws=null;return later()}
+    w.binaryType='arraybuffer';buf=new Uint8Array(0);lastRx=Date.now();
+    w.onopen=()=>put(connectPkt());
+    w.onmessage=e=>{if(ws===w)onData(e.data)};
+    w.onerror=()=>{try{w.close()}catch(e){}};
+    w.onclose=()=>{if(ws!==w)return;ws=null;if(up){up=false;o.onDown()}later()};
+    setTimeout(()=>{if(ws===w&&!up)try{w.close()}catch(e){}},10000);   // no answer: try again
+  }
+  const iv=setInterval(()=>{                       // keep-alive; drop a connection that died while asleep
+    if(closed)return clearInterval(iv);
+    if(!ws)return;
+    if(Date.now()-lastRx>45000){try{ws.close()}catch(e){}return}
+    if(up)put(new Uint8Array([0xC0,0]));
+  },15000);
+  // Coming back to the foreground (or the network changing): the phone may have paused this page and
+  // quietly killed its connection, so messages sent meanwhile never arrived. Ask the relay again for
+  // everything it has stored, check the line answers, and replace it if it doesn't within 4 seconds.
+  let lastWake=0;
+  function wake(){
+    if(closed||document.hidden||Date.now()-lastWake<1500)return;
+    lastWake=Date.now();retry=1500;
+    if(!ws){open();return}
+    if(!up)return;                                 // still connecting; that will fetch everything anyway
+    const mark=Date.now();
+    put(subPkt());put(new Uint8Array([0xC0,0]));
+    o.onUp();
+    setTimeout(()=>{if(!closed&&ws&&lastRx<mark){retry=300;try{ws.close()}catch(e){}}},4000);
+  }
+  document.addEventListener('visibilitychange',wake);
+  window.addEventListener('focus',wake);
+  window.addEventListener('pageshow',wake);
+  window.addEventListener('online',wake);
+  open();
+  return{up:()=>up,pub(t,s,ret){if(up)put(mpkt(0x30|(ret?1:0),cat([mstr(t),te8.encode(s)])))},
+    restart(){if(closed)return;clearTimeout(timer);retry=1500;const w=ws;ws=null;if(up){up=false;o.onDown()}if(w)try{w.close()}catch(e){}open()},
+    close(){closed=true;clearTimeout(timer);clearInterval(iv);const w=ws;ws=null;up=false;if(w)try{w.send(new Uint8Array([0xE0,0]));w.close()}catch(e){}}};
+}
+
+/* ---------- connection test ----------
+   For each relay: connect, send a message to ourselves through it and time the round trip.
+   For the direct link: check that PeerJS's introduction server answers. */
+let netT=null;
+function relayTest(relay){return new Promise(res=>{
+  const t0=performance.now(),topic='mafianight/v1/test/'+rid(10);let sent=0,done=false,c=null;
+  const fin=r=>{if(done)return;done=true;try{c&&c.close()}catch(e){}res(r)};
+  c=miniMqtt(relay,{id:'mft'+rid(10),subs:[topic],will:null,
+    onUp(){sent=performance.now();c.pub(topic,'ping',false)},onDown(){},
+    onMsg(t,m){if(t===topic&&m==='ping')fin({ok:true,conn:sent-t0,rt:performance.now()-sent})}});
+  setTimeout(()=>fin({ok:false}),10000);
+})}
+function peerTest(){return new Promise(res=>{
+  if(!window.Peer)return res({ok:false});
+  const t0=performance.now();let p=null,done=false;
+  const fin=r=>{if(done)return;done=true;try{p&&p.destroy()}catch(e){}res(r)};
+  try{p=new Peer(window.MAFIA_PEER_OPTS||{})}catch(e){return fin({ok:false})}
+  p.on('open',()=>fin({ok:true,conn:performance.now()-t0}));p.on('error',()=>fin({ok:false}));
+  setTimeout(()=>fin({ok:false}),10000);
+})}
+async function runNetTest(){
+  if(netT&&netT.busy)return;
+  netT={busy:true,r:RELAYS.map(()=>null),p:null};render();
+  const jobs=RELAYS.map((u,k)=>relayTest(u).then(x=>{netT.r[k]=x;render()}));
+  jobs.push(peerTest().then(x=>{netT.p=x;render()}));
+  await Promise.all(jobs);netT.busy=false;render();
+}
+const secs=ms=>(ms/1000).toFixed(ms<1000?2:1)+' s';
+function netV(){
+  const t=netT||{busy:true,r:[],p:null};
+  const row=(name,x,okText)=>`<div class="row"><span><i class="dot ${x&&x.ok?'on':''}"></i>${name}</span><small class="${x&&!x.ok?'err':'mut'}" style="white-space:nowrap">${!x?'Testing…':x.ok?okText(x):'Not reachable'}</small></div>`;
+  const rows=RELAYS.map((u,k)=>row(`Relay ${k+1}${u.name?' ('+u.name+')':''}`,t.r[k],x=>`Works · ${secs(x.rt)}`)).join('')
+    +row('Direct link',t.p,x=>'Works');
+  const relOk=t.r.filter(x=>x&&x.ok).length;
+  let verdict='';
+  if(!t.busy){
+    verdict=relOk===RELAYS.length?`<p><b>Good to go.</b> This phone can reach all ${RELAYS.length} relays, so it can host or join a game.</p>`
+      :relOk>0?`<p><b>Good to go.</b> ${relOk} of ${RELAYS.length} relays work here. One is enough to play.</p>`
+      :t.p&&t.p.ok?`<p class="err">None of the relays work on this network.</p><p class="mut">The game can still try the direct link, but that often fails. Try switching this phone to mobile data, or another Wi-Fi.</p>`
+      :`<p class="err">This phone can't reach any of the game's servers.</p><p class="mut">Check that it's online. Some Wi-Fi networks (offices, schools, hotels) block them: try mobile data instead.</p>`;
+  }
+  return `<button class="link" data-a="home">← Back</button><h2>Connection test</h2>
+<p class="mut">Checks whether this phone can reach the servers the game uses. The time is how long a message takes to get through. If someone can't join, run it on their phone.</p>
+<div class="card">${rows}</div>${verdict}
+<button class="pri" data-a="nettest"${t.busy?' disabled':''}>${t.busy?'Testing…':'Test again'}</button>`;
+}
+
+function mixNet(){
+  const base='mafianight/v1/'+me.code.toLowerCase();
+  const myT=base+'/p/'+me.i;                      // player ids only use a-z and digits
+  const PO=window.MAFIA_PEER_OPTS||{};
+  const hid='mafia-night-cl-'+me.code.toLowerCase();
+  let Q=Date.now(),env=null,peerUp=false,gotG=false,pc=null,byeDone=null;
+  const conns=new Set(),relays=[];
+  const last={},seen={};                          // newest message number, and when each player was last heard from
+  const anyUp=()=>relays.some(r=>r.up())||peerUp;
+  let upSince=0;
+  const status=()=>{const u=anyUp();if(u&&!upSince)upSince=Date.now();if(!u)upSince=0;setConn(me.host?u:(u&&gotG))};
+
+  function fromPlayer(src,d,stored){
+    const s=d&&d.s;if(!s||!s.i||s.i===me.i)return;
+    if(G&&G.kk&&G.kk.includes(s.i))return;        // removed by the guide
+    const at=stored?(d.t||0):Date.now();          // a stored copy only tells us when it was sent
+    if(at>(seen[s.i]||0))seen[s.i]=at;
+    if(last[s.i]&&d.q<=last[s.i])return;
+    last[s.i]=d.q;
+    if(s.bye){if(players[s.i])drop(s.i);return}   // they tapped Leave (mid-game too: they're left out of the next round)
+    onNet(Object.assign({},players,{[s.i]:s}),null);
+  }
+  function drop(id){const m=Object.assign({},players);delete m[id];delete seen[id];onNet(m,null)}
+
+  // Guide only: in the lobby, remove a player who hasn't been heard from for 15 minutes
+  // (phone asleep or page closed that long). Sleeping for less than that changes nothing.
+  if(me.host){
+    let tick=Date.now();
+    setInterval(()=>{
+      const now=Date.now();
+      if(now-tick>60e3)upSince=anyUp()?now:0;    // this phone was asleep itself: listen a while before judging
+      tick=now;
+      if(!G||G.ph!=='lobby'||!upSince||now-upSince<150e3)return;
+      for(const id in players){
+        if(id===me.i)continue;
+        if(now-(seen[id]||0)>15*60e3){delete last[id];drop(id)}
+      }
+    },30e3);
+  }
+  function fromHost(d){
+    if(!d||!d.g||(last.g&&d.q<=last.g))return;
+    if(d.t&&Date.now()-d.t>6*3600e3)return;   // an old game left behind on a relay
+    last.g=d.q;gotG=true;onNet(null,d.g);status();
+  }
+
+  RELAYS.forEach((relay,k)=>{
+    const src='r'+k;
+    const r=miniMqtt(relay,{
+      id:'mf'+rid(12),
+      subs:[me.host?base+'/p/+':base+'/g'],
+      onUp(){status();if(env)r.pub(me.host?base+'/g':myT,JSON.stringify(env),true);
+        if(byeDone){const f=byeDone;byeDone=null;setTimeout(f,400)}},   // the goodbye went out on a working connection
+      onDown(){status()},
+      onMsg(t,s,stored){
+        if(me.host){
+          // A brand-new game: anything stored from before it was created belongs to an old game with this word. Wipe it.
+          if(stored&&freshGame&&s){let d=null;try{d=JSON.parse(s)}catch(e){}
+            if(!d||!d.t||d.t<freshGame-2000){r.pub(t,'',true);return}}
+          if(!s)return;
+          try{fromPlayer(src,JSON.parse(s),stored)}catch(e){}
+        }else if(s){try{fromHost(JSON.parse(s))}catch(e){}}
+      }
+    });
+    relays.push(r);
+  });
+
+  if(window.Peer)try{
+    if(me.host){
+      let p,wait=2500;
+      const start=()=>{
+        p=new Peer(hid,PO);
+        p.on('open',()=>{wait=2500;peerUp=true;status()});
+        p.on('connection',c=>{
+          c.on('open',()=>{conns.add(c);if(env)try{c.send(env)}catch(e){}});
+          c.on('data',d=>{if(d&&d.s&&d.s.i){c.pid=d.s.i;fromPlayer('p',d)}});
+          c.on('close',()=>conns.delete(c));
+        });
+        p.on('error',e=>{
+          if(e.type==='unavailable-id'){peerUp=false;status();try{p.destroy()}catch(x){}
+            setTimeout(start,wait);wait=Math.min(wait*2,30000)}
+        });
+        p.on('disconnected',()=>{peerUp=false;status();setTimeout(()=>{try{p.reconnect()}catch(e){}},2000)});
+      };
+      start();
+    }else{
+      const p=new Peer(PO);let rt=null,wait=2500;
+      const redial=()=>{clearTimeout(rt);rt=setTimeout(dial,wait);wait=Math.min(wait*1.6,30000)};
+      const dial=()=>{
+        if(p.destroyed)return;
+        if(p.disconnected){try{p.reconnect()}catch(e){}}
+        if(pc){try{pc.close()}catch(e){}}
+        const cc=pc=p.connect(hid,{reliable:true});
+        setTimeout(()=>{if(pc===cc&&!cc.open){try{cc.close()}catch(e){}redial()}},8000);
+        cc.on('open',()=>{if(pc!==cc)return;wait=2500;peerUp=true;status();if(env)try{cc.send(env)}catch(e){}});
+        cc.on('data',d=>{if(pc===cc)fromHost(d)});
+        cc.on('close',()=>{if(pc!==cc)return;peerUp=false;status();redial()});
+      };
+      p.on('open',dial);
+      p.on('error',e=>{if(['peer-unavailable','network','disconnected','webrtc'].includes(e.type))redial()});
+    }
+  }catch(e){}
+
+  function out(e){
+    const t=me.host?base+'/g':myT,s=JSON.stringify(e);
+    relays.forEach(r=>r.pub(t,s,true));
+    if(me.host)conns.forEach(c=>{try{if(c.open)c.send(e)}catch(x){}});
+    else if(pc&&pc.open)try{pc.send(e)}catch(x){}
+  }
+  // "Still here": resend the latest message with a fresh time once a minute while the page is open.
+  // It stops when the phone sleeps, which is how the guide can tell how long someone has been away.
+  setInterval(()=>{if(env){env.t=Date.now();out(env)}},60e3);
+
+  return{
+    send(){env=me.host?{q:++Q,t:Date.now(),g:G}:{q:++Q,t:Date.now(),s:st};out(env)},
+    // Tapped Leave: send a goodbye. The connection may have died quietly while this browser was in the
+    // background, so also send it again on fresh connections, and report back once it has gone out.
+    bye(){
+      if(me.host)return Promise.resolve();
+      env={q:++Q,t:Date.now(),s:{i:me.i,bye:1}};out(env);
+      return new Promise(res=>{byeDone=res;relays.forEach(r=>r.restart());setTimeout(res,8000)});
+    }
+  };
+}
+
+/* ---------- views ---------- */
+/* The host asked this player to pick a different name (lobby only) */
+function renameV(){if(!G||G.ph!=='lobby'||me.host||!G.rn||!G.rn[me.i]||(st.rnd||0)>=G.rn[me.i])return '';
+  return `<div class="pop" role="dialog" aria-modal="true" aria-labelledby="rnh"><div class="card"><p id="rnh" class="disp" style="font-size:26px">New name, please</p><p>The guide asked you to change your name. Pick something everyone will recognise.</p><label for="rnn">Your new name</label><input id="rnn" maxlength="16" autocomplete="off" value="${esc(ui.rnn==null?'':ui.rnn)}" data-enter="rnsave"><button class="pri big" data-a="rnsave">Save my new name</button></div></div>`}
+const rnBtn=i=>me.host&&i!==me.i&&G&&G.ph==='lobby'?`<button class="link" data-a="sfxo" data-p="${esc(i)}">Change name</button> `:'';
+/* The host can add a few words after a player's name, e.g. "Ben (tall)" */
+const fullName=s=>{const o=G&&G.nmx&&G.nmx[s.i],b=String(o||s.n).slice(0,16),x=G&&G.sfx&&G.sfx[s.i];return x?b+' '+x:b};
+function sfxV(){
+  const i=ui.sfxFor;if(!i||!me.host||!G||G.ph!=='lobby')return '';
+  const pl=players[i]||{i},base=String(pl.n||'this player').slice(0,16),now=fullName(pl),changed=(G.sfx&&G.sfx[i])||(G.nmx&&G.nmx[i]);
+  return `<div class="pop" role="dialog" aria-modal="true" aria-labelledby="sfh"><div class="card"><p id="sfh" class="disp" style="font-size:24px">Change ${esc(base)}'s name</p><p class="mut">Shown on everyone's phone as: <b>${esc(now)}</b></p><label for="sfx">New text</label><input id="sfx" maxlength="16" autocomplete="off" value="${esc(ui.sfxv==null?'':ui.sfxv)}" placeholder="e.g. Ben, or (red jumper)"><button class="pri big" data-a="sfxs">Add to the end of the name</button><button class="pri big" data-a="sfxr">Replace the whole name</button>${changed?`<button data-a="sfxd">Go back to "${esc(base)}"</button>`:''}<button data-a="sfxc">Cancel</button></div></div>`;
+}
+
+function rnClean(){if(G&&G.rn)for(const k in G.rn){const s=acts[k];if(!players[k]||(s&&(s.rnd||0)>=G.rn[k]))delete G.rn[k]}}
+function hero(){
+  const b=[[0,34,70],[30,26,110],[52,40,84],[88,22,128],[106,36,96],[138,30,140],[164,44,104],[204,26,76],[226,38,122],[260,24,90],[280,46,150],[322,30,100],[348,28,118],[372,34,82]];
+  const w=[];b.forEach(([x,bw,h],k)=>{for(let y=230-h+12;y<222;y+=18)for(let xx=x+6;xx<x+bw-6;xx+=10)if((xx*7+y*3+k)%5===0)w.push(`<rect x="${xx}" y="${y}" width="4" height="7" fill="${(xx+y)%3?'#f2c46d':'#e3343e'}" opacity=".85"/>`)});
+  return `<div class="hero" aria-hidden="true"><svg viewBox="0 0 400 230" preserveAspectRatio="xMidYMax slice">
+<defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a1224"/><stop offset="1" stop-color="#140a10"/></linearGradient>
+<radialGradient id="gl"><stop offset="0" stop-color="#ffe9c8" stop-opacity=".55"/><stop offset="1" stop-color="#ffe9c8" stop-opacity="0"/></radialGradient></defs>
+<rect width="400" height="230" fill="url(#sk)"/><circle cx="292" cy="74" r="80" fill="url(#gl)"/>
+<circle cx="292" cy="74" r="36" fill="#f6e3c4"/><circle cx="306" cy="64" r="34" fill="#3a1224" opacity=".18"/>
+${b.map(([x,bw,h])=>`<rect x="${x}" y="${230-h}" width="${bw+1}" height="${h}" fill="#0a0408"/>`).join('')}
+<rect x="150" y="${230-152}" width="6" height="14" fill="#0a0408"/>${w.join('')}
+<rect y="222" width="400" height="8" fill="#e3343e"/></svg></div>`;
+}
+function rulesV(){
+  return `<details><summary>How to play &amp; the roles</summary>
+<p>One person is the guide: they host the game on their phone and play too. Everyone else taps <b>Start playing</b> and enters the guide's code.</p>
+<p>At night, everyone taps a choice on their phone at the same time, so nobody can tell who has a power. When everyone is done, the guide wakes the town. In the morning you see who died. During the day, talk it over and vote someone out.</p>
+<p>The town wins when every Mafia member is gone. The Mafia win when only Mafia are left.</p>
+<p><b>Play styles.</b> ${Object.values(MODES).map(m=>`<b>${m[0]}:</b> ${m[1]}`).join(' ')}</p>
+<dl>${ORDER.concat('peasant').map(k=>`<dt>${R[k].n}</dt><dd>${R[k].d}</dd>`).join('')}</dl></details>`;
+}
+function homeV(){
+  return `<a class="homelink" href="./">← Home</a>`+hero()+`<h1>Mafia</h1>${ui.notice?`<p class="err">${esc(ui.notice)}</p>`:''}${ui.rejoin?`<button class="pri" data-a="rejoin">Join game ${esc(ui.rejoin.c)} again</button>`:''}<p class="mut">For one room full of people, each on their own phone. One player guides the game and plays too.</p>
+<button class="pri big" data-a="start">Start playing Mafia</button>
+<button class="link" data-a="hostnew">I'm the guide: host a new game</button><br><button class="link" data-a="practice">Practice mode: try every role alone</button><br><button class="link" data-a="nettest">Test connection: can this phone reach the servers?</button><br><button class="link" data-a="hunterhome">Test the Hunter: get voted out and take your shot</button><br><button class="link" data-a="deadhome">Test the death screen: see what it's like to die</button>${rulesV()}`;
+}
+function joinV(){
+  const h=ui.mode==='host';
+  return `<button class="link" data-a="home">← Back</button><h2>${h?'Host a game':'Join the game'}</h2>
+<label for="nm">Your name</label><input id="nm" maxlength="16" autocomplete="nickname" value="${esc(ui.name)}">
+${h?'<p class="mut">You\'ll get a 4-letter code to share. You get dealt a role like everyone else.</p>':`<label for="cd">Game code (ask the guide)</label><input id="cd" maxlength="4" autocapitalize="characters" autocomplete="off" value="${esc(ui.code)}" style="text-transform:uppercase;letter-spacing:.2em">`}
+${err?`<p class="err">${esc(err)}</p>`:''}
+<button class="pri big" data-a="${h?'create':'join'}">${h?'Create game':'Join'}</button>`;
+}
+function bar(){
+  if(ui.practice)return `<div class="bar"><span><span class="tag">Practice</span> ${esc(me.n)} with ${ui.bots} computer players</span><span><button class="link" data-a="pexit">Exit</button></span></div>`+practiceTools();
+  return `<div class="bar"><span><i class="dot ${conn?'on':''}"></i>Game ${esc(me.code)} · ${esc(me.n)}${me.host?' · guide':''}</span><span>${ui.sure==='leave'?'<button class="link" data-a="leave">Tap again to leave</button>':'<button class="link" data-a="leave">Leave</button>'}</span></div>`;
+}
+const card=x=>`<div class="card">${x}</div>`;
+const guideCard=(say,x)=>x?`<div class="card guide">${x}</div>`:'';
+const prog=()=>`<div class="prog"><i style="width:${G.tot?Math.round(100*(G.done||0)/G.tot):0}%"></i></div><p class="mut">${G.done||0} of ${G.tot||0} done</p>`;
+function optList(ids,k,multi){
+  return `<div class="list pick">${ids.map(i=>{const on=multi?ui[k].includes(i):ui[k]===i;
+    return `<button class="opt${on?' sel':''}" data-a="sel" data-k="${k}" data-p="${esc(i)}"><span>${esc(nm(i))}${i===me.i?' <small>(you)</small>':''}</span><small>${on?'Selected':''}</small></button>`}).join('')}</div>`;
+}
+const vis=(name,r)=>r==='X'?`Your power failed. Nothing was revealed about <b>${name}</b>`:String(r).startsWith('Y:')?`Correct guess: <b>${name}</b> is the <b>${R[r.slice(2)].n}</b>`:String(r).startsWith('W:')?`Wrong guess: <b>${name}</b> is not the <b>${R[r.slice(2)].n}</b>`:r==='M'?`<b>${name}</b> is <b>Mafia</b>`:r==='N'?`<b>${name}</b> is <b>not Mafia</b>`:`<b>${name}</b> is the <b>${R[r].n}</b>`;
+function roleName(i){const r=role(i);return r==='drunk'?`Drunk (thought they were the ${R[shown(i)].n})`:R[r].n}
+function deathLine(i,verb){return `<p><b>${esc(nm(i))}</b> ${verb}${ghost(i)?' and came back as a ghost':''}${G.rev?`. They were the <b>${roleName(i)}</b>.`:'.'}</p>`}
+function rolesList(){return card(`<p class="mut">Everyone's true role</p>${G.pl.map(p=>`<div class="row"><span class="${p.a?'':'dead'}">${esc(p.n)}</span><span>${roleName(p.i)}${partner(p.i)?' · in love':''}${ghost(p.i)?' · ghost':''}</span></div>`).join('')}`)}
+function teammates(){return G.pl.filter(p=>p.i!==me.i&&role(p.i)==='mafia')}
+function compV(){
+  if(G.mode&&G.mode!=='std')return '';
+  return ui.comp?card(`<p><b>Characters in this game</b></p><p>${compText().replace('Roles in this game: ','')}</p><button data-a="comp">Hide</button>`):`<button data-a="comp">What characters are in this game?</button>`;
+}
+function roleV(){
+  if(!G.ro||!G.ro[me.i])return '';
+  if(!ui.showRole)return `<button data-a="role">Show my role (keep it hidden)</button>`;
+  const s=shown(me.i);let x=`<div class="card role"><p class="mut">You are the</p><div class="disp">${R[s].n}</div><p>${R[s].d}</p>`;
+  if(role(me.i)==='mafia'){const t=teammates();x+=t.length?`<p><b>Your fellow Mafia:</b> ${t.map(p=>esc(p.n)+(p.a?'':' (dead)')).join(', ')}</p>`:'<p>You are the only Mafia.</p>'}
+  const pt=partner(me.i);if(pt)x+=`<p><b>You are in love with ${esc(nm(pt))}.</b> If one of you dies, so does the other.</p>`;
+  if(nfPct(G,role(me.i)))x+=`<p class="mut">Nerf mode: your power has a ${nfPct(G,role(me.i))}% chance to fail each time you use it.</p>`;
+  if(s==='witch')x+=`<p class="mut">Poison: ${G.pu[me.i]?'used':'ready'}</p>`;
+  if(s==='shuffler')x+=`<p class="mut">Shuffle: ${G.su[me.i]?'used':'ready'}</p>`;
+  if(notes.length)x+=`<p class="mut" style="margin-top:12px">Your findings</p>`+notes.map(n=>`<p>Night ${n.n}: ${vis(esc(n.name),n.r)}</p>`).join('');
+  if(!mine().a)x+=ghost(me.i)?`<p class="mut">You're a ghost: no powers, ${ghost(me.i).v?'one ghost vote left':'ghost vote used'}.</p>`:`<p class="err">You're out of the game.</p>`;
+  if(s==='seer'&&seerGuess())x+=`<p class="mut">Guessing Seer: you must guess the role of the person you check. A wrong guess only tells you it was wrong.</p>`;
+  if(blocked(me.i)&&(s==='healer'||s==='witch')&&mine().a)x+=`<p class="mut">Alternating healer: you can't protect ${esc(nm(blocked(me.i)))} tonight, because you protected them last night.</p>`;
+  return x+`<button data-a="role">Hide my role</button></div>`;
+}
+/* Dead players can look at everyone's roles, but only behind a button, so a phone left on the table gives nothing away */
+function deadV(){return card(`<p><b>You're out.</b> Stay quiet, no hints! You can watch everything now.</p>`+(ui.seeAll?'':`<button data-a="seeall">Show everyone's roles</button>`))+(ui.seeAll?rolesList()+`<button class="pri" data-a="seeall">Hide the roles</button>`:'')}
+/* Ghosts don't get the normal death screen (no peek at everyone's roles): they're still playing */
+function ghostV(){const g=ghost(me.i);
+  return `<div class="card role ghost"><div class="disp" style="font-size:30px">You're a ghost</div><p>You died, but you're still in the game. You have no powers${g&&g.v?', but you have <b>one ghost vote</b> to use in any daytime vote':', and you have used your ghost vote'}.</p><p class="mut">Keep playing along. Don't reveal anything you couldn't know.</p></div>`}
+const outV=()=>ghost(me.i)?ghostV():deadV();
+function ghostVoteV(){
+  const v=st.vote&&st.vote.rd===G.rd?st.vote:null;
+  if(v)return `<div class="card role ghost"><p>You used your ghost vote on <b>${esc(nm(v.t))}</b>. It counts when the guide reveals the votes.</p></div>`;
+  if(ui.cf&&ui.v)return cfV();
+  return `<div class="card role ghost"><div class="disp" style="font-size:30px">You're a ghost</div><p>You have <b>one ghost vote</b> for the rest of the game. Use it today, or keep it for a later day.</p>${optList(alive(),'v')}<button class="pri big" data-a="vote" ${ui.v?'':'disabled'}>Use my ghost vote</button><p class="mut">Keeping it for later? Just don't vote today.</p></div>`;
+}
+function latestSug(){
+  /* newest suggestion from a teammate that differs from mine */
+  const ms=G.ms||{},mine=ms[me.i];let L=null;
+  for(const k in ms){if(k===me.i||!isAlive(k))continue;const v=ms[k];if(mine&&mine.t===v.t)continue;if(!L||v.at>L.at)L={by:k,t:v.t,at:v.at}}
+  return L;
+}
+function mafiaPopup(){
+  if(!mine()||!mine().a)return '';
+  if(shown(me.i)!=='mafia'||!teammates().some(p=>p.a)||G.ag||ui.cf)return '';
+  const L=latestSug();if(!L||ui.dis===L.by+L.t+L.at)return '';
+  return `<div class="pop" role="dialog" aria-modal="true" aria-labelledby="popt"><div class="card role"><div class="disp" id="popt" style="font-size:26px;color:var(--acc)">New suggestion</div>
+<p style="font-size:19px"><b>${esc(nm(L.by))}</b> has suggested to kill <b>${esc(nm(L.t))}</b>.</p>
+<button class="pri big" data-a="magree">Agree</button><button data-a="mother">Suggest someone else</button></div></div>`;
+}
+function mafiaPanel(){
+  const tm=teammates().filter(p=>p.a),ms=G.ms||{},mine=ms[me.i];
+  if(!tm.length){/* only one Mafia left: pick and confirm */
+    const mineT=st.act&&st.act.rd===G.rd?st.act.t:null,sel=ui.t||mineT;
+    return card(`<div class="disp" style="font-size:30px;color:var(--acc)">You are Mafia</div><p>Select who to eliminate tonight.</p>${optList(alive().filter(i=>role(i)!=='mafia'),'t')}<button class="pri big" data-a="act" ${sel?'':'disabled'}>Confirm</button>`);
+  }
+  const sel=ui.t||(mine&&mine.t);
+  let x=`<div class="disp" style="font-size:30px;color:var(--acc)">You are Mafia</div><p>Suggest who to eliminate. Your team must all agree, then one of you confirms the kill.</p><p class="mut">Your team: ${tm.map(p=>esc(p.n)).join(', ')}.</p>`;
+  if(G.agp)x+=`<div class="card role" style="margin:10px 0"><p style="margin-top:0">Everyone agrees on <b>${esc(nm(G.agp))}</b>.</p><button class="pri big" data-a="act" data-x="mkill">Confirm the kill</button></div>`;
+  x+=`<div class="list pick">`+alive().filter(i=>role(i)!=='mafia').map(i=>{
+    const by=tm.filter(p=>ms[p.i]&&ms[p.i].t===i).map(p=>esc(p.n));if(mine&&mine.t===i)by.unshift('You');
+    return `<button class="opt${sel===i?' sel':''}" data-a="sel" data-k="t" data-p="${esc(i)}"><span>${esc(nm(i))}${by.length?`<br><small style="white-space:normal;color:var(--acc);font-weight:600">${by.join(' · ')}</small>`:''}</span></button>`}).join('')+`</div>`;
+  if(!G.agp&&mine)x+=`<p class="say">You suggested ${esc(nm(mine.t))}. Waiting for your team…</p>`;
+  if(!G.agp||(ui.t&&ui.t!==G.agp))x+=`<button class="${G.agp?'':'pri big'}" data-a="msug" ${ui.t&&(!mine||ui.t!==mine.t)?'':'disabled'}>${ui.t?'Suggest '+esc(nm(ui.t)):'Select a name to suggest'}</button>`;
+  return card(x);
+}
+function cfText(){
+  const a=ui.cf.a,n=i=>`<b>${esc(nm(i))}</b>`;
+  if(a==='vote')return ui.v==='-'?'You are choosing to <b>skip</b> and vote for no one.':`You are voting for ${n(ui.v)}.`;
+  if(a==='shoot')return ui.t==='-'?'You are choosing to <b>miss your shot</b>. No one is killed.':`You are shooting ${n(ui.t)}.`;
+  const s=shown(me.i);
+  if(s==='mafia')return `You are confirming the kill on ${n(ui.t)}. Tonight's kill is final.`;
+  if(s==='healer')return `You are protecting ${n(ui.t)}.`;
+  if(s==='seer')return seerGuess()&&ui.g?`You are guessing that ${n(ui.t)} is the <b>${R[ui.g].n}</b>.`:`You are checking ${n(ui.t)}'s role.`;
+  if(s==='detective')return `You are checking if ${n(ui.t)} is Mafia.`;
+  if(s==='witch')return `You are protecting ${n(ui.t)}${ui.k?` and killing ${n(ui.k)}. Your kill can only be used once`:''}.`;
+  if(s==='cupid'&&G.dn===0)return `You are making ${n(ui.lv[0])} and ${n(ui.lv[1])} fall in love.`;
+  if(s==='shuffler'&&!G.su[me.i])return ui.cf.x==='pass'?'You are skipping your shuffle tonight.':`You are swapping the roles of ${n(ui.sw[0])} and ${n(ui.sw[1])}. You can only do this once.`;
+  return `You are picking ${n(ui.t)}. This does nothing.`;
+}
+function cfV(){
+  return card(`<div class="disp" style="font-size:30px;color:var(--acc)">Are you sure?</div><p>${cfText()}</p><p class="mut">You can't change it after this.</p><button class="pri big" data-a="${ui.cf.a}" data-x="${esc(ui.cf.x||'')}" data-ok="1">Yes, I'm sure</button><button data-a="cfback">No, go back</button>`);
+}
+function timerV(){
+  if(G.nt||G.ph!=='night'||!G.t0||allDone())return '';
+  const el=hostNow()-G.t0;if(el<40000)return '';
+  const left=Math.max(0,Math.ceil((60000-el)/1000));
+  return `<div class="card role"><div class="disp" style="font-size:48px">${left}s</div><p>${st.act&&st.act.rd===G.rd&&(shown(me.i)!=='mafia'||G.ag)?'Waiting for the last players.':'Hurry! When the timer runs out, your action is skipped.'}</p></div>`;
+}
+function actionPanel(){
+  const al=alive(),others=al.filter(i=>i!==me.i),s=shown(me.i);
+  const sub=(ok,l)=>`<button class="pri big" data-a="act" ${ok?'':'disabled'}>${l||'Confirm'}</button>`;
+  const head=(k,line)=>`<div class="disp" style="font-size:30px;color:var(--acc)">You are ${k==='mafia'?'':k==='peasant'?'a ':'the '}${R[k].n}</div><p>${line}</p>`;
+  if(s==='mafia')return mafiaPanel();
+  const bl=blocked(me.i),blNote=bl?`<p class="mut">You protected ${esc(nm(bl))} last night, so you can't pick them tonight (Alternating healer).</p>`:'';
+  if(s==='healer')return card(head(s,'Select someone to protect.')+blNote+optList(al.filter(i=>i!==bl),'t')+sub(ui.t));
+  if(s==='seer'&&seerGuess())return card(head(s,'Select someone, then guess their role. If you guess right, it\'s confirmed. If you guess wrong, you only learn that the guess was wrong.')+optList(others,'t')+
+    `<p style="margin:14px 0 4px"><b>Your guess${ui.t?` for ${esc(nm(ui.t))}`:''}</b></p><div class="list pick">${GUESSABLE.map(k=>`<button class="opt${ui.g===k?' sel':''}" data-a="sguess" data-r="${k}"><span>${R[k].n}</span><small>${ui.g===k?'Selected':''}</small></button>`).join('')}</div>`+
+    sub(ui.t&&ui.g,ui.t&&ui.g?`Guess ${esc(nm(ui.t))} is the ${R[ui.g].n}`:'Pick a person and a role'));
+  if(s==='seer')return card(head(s,'Select someone to check their role.')+optList(others,'t')+sub(ui.t,'Check their role'));
+  if(s==='detective')return card(head(s,'Select someone to check if they are Mafia.')+optList(others,'t')+sub(ui.t,'Check'));
+  if(s==='cupid'&&G.dn===0)return card(head(s,'Select two players to fall in love.')+optList(al,'lv',true)+sub(ui.lv.length===2,'Shoot the arrow'));
+  if(s==='witch'){
+    const can=!G.pu[me.i];
+    let x=head(s,can?'Choose a person to protect, and optionally choose a person to kill <b>(one time this game)</b>.':'Choose a person to protect. <span class="mut">Your kill is used up.</span>')+blNote;
+    x+=`<div class="list pick">`+al.map(i=>`<div class="wrow${ui.t===i?' pr':''}${ui.k===i?' kl':''}"><span>${esc(nm(i))}${i===me.i?' <small>(you)</small>':''}</span><span class="wbtn">`+
+      (i===bl?'<small class="mut">Last night</small>':`<button class="${ui.t===i?'on':''}" data-a="wpro" data-p="${esc(i)}" aria-pressed="${ui.t===i}">Protect</button>`)+
+      (can&&i!==me.i?`<button class="kill${ui.k===i?' on':''}" data-a="wkill" data-p="${esc(i)}" aria-pressed="${ui.k===i}">Kill</button>`:'')+`</span></div>`).join('')+`</div>`;
+    return card(x+sub(ui.t,ui.k?`Protect ${esc(nm(ui.t||''))} and kill ${esc(nm(ui.k))}`:'Confirm'));
+  }
+  if(s==='shuffler'&&!G.su[me.i])return card(head(s,'Select two players to swap their roles, or skip tonight.')+optList(al,'sw',true)+sub(ui.sw.length===2,'Swap these two')+`<button data-a="act" data-x="pass">Skip tonight</button>`);
+  return card(head(s,'You do nothing at night. Select a name below to pretend you\'re doing something.')+optList(others,'t')+sub(ui.t));
+}
+function nightV(){
+  let h=`<h2>Night ${G.dn+1}</h2>`+timerV()+mafiaPopup();
+  if(!mine().a)h+=outV();
+  else{
+    const a=shown(me.i)==='mafia'?!!G.ag:st.act&&st.act.rd===G.rd,sr=G.sr[me.i]&&G.sr[me.i].rd===G.rd?G.sr[me.i]:null;
+    if(a){h+=card(`<p><b>Done.</b> Put your phone down and wait for the guide to wake the town.</p>${prog()}`+
+      (sr?`<p class="say">${sr.r==='X'?'':shown(me.i)==='detective'?'Your investigation: ':'Your vision: '}${vis(esc(nm(sr.t)),sr.r)}.</p>`:'')+
+      (role(me.i)==='mafia'?`<p>Kill confirmed: <b>${esc(nm(G.ag))}</b>${G.cb&&G.cb!==me.i?` (confirmed by ${esc(nm(G.cb))})`:''}.</p>`:'')+(sr||shown(me.i)==='mafia'?'':`<button data-a="undo">Change my choice</button>`))}
+    else h+=ui.cf?cfV():actionPanel();
+  }
+  if(me.host)h+=guideCard('"Night falls. Everyone, look at your own phone and secretly make your choice. Keep your screen hidden."',
+    prog()+(allDone()?`<button class="pri big" data-a="wake">${G.to?'Time is up: wake the town':'Everyone is done: wake the town'}</button>`:`<p class="mut">The wake button appears when everyone is done${G.nt?'':' or the timer runs out'}.</p>`));
+  return h;
+}
+function infoV(){return roleV()+compV()+`<button data-a="help">How roles work</button>`}
+function morningV(){
+  let x=(G.dead.length?G.dead.map(i=>deathLine(i,'was killed in the night')).join(''):'<p><b>Everyone survived the night.</b></p>')+hbLines();
+  let h=`<h2>Morning, day ${G.dn}</h2>`+card(x);
+  (G.msg[me.i]||[]).forEach(m=>h+=`<div class="card role"><p>${esc(m)}</p></div>`);
+  if(!mine().a)h+=outV();
+  if(me.host)h+=guideCard(`"Wake up, everyone! Look at your phones to see what happened in the night. Then discuss: who is the Mafia?"`,`<button class="pri big" data-a="toVote">Open the vote</button>`);
+  return h+infoV();
+}
+function dayV(){
+  let h=`<h2>Day ${G.dn}: the vote</h2><p>Talk it over, then vote for who you think is Mafia. Votes stay secret until the guide reveals them.</p>`;
+  if(!mine().a)h+=ghost(me.i)&&ghost(me.i).v?ghostVoteV():outV();
+  else{const v=st.vote&&st.vote.rd===G.rd?st.vote:null;
+    h+=v?card(`<p>You voted for <b>${esc(nm(v.t))}</b>. Your vote is locked in.</p>${prog()}`)
+      :ui.cf&&ui.v?cfV():false?card(`<p class="disp" style="font-size:28px">Are you sure?</p><p>${ui.v==='-'?'You are choosing to <b>skip</b> and vote for no one.':`You are voting for <b>${esc(nm(ui.v))}</b>.`} You can't change your vote after this.</p><button class="pri big" data-a="vote">Yes, ${ui.v==='-'?'skip my vote':'vote for '+esc(nm(ui.v))}</button><button data-a="cvback">No, go back</button>`)
+      :card(`<p><b>Cast your vote</b></p>${optList(alive().filter(i=>i!==me.i).concat('-'),'v')}<button class="pri big" data-a="vote" ${ui.v?'':'disabled'}>Cast vote</button>`)}
+  if(me.host)h+=guideCard('',prog()+(allDone()?'<button class="pri big" data-a="reveal">All votes are in: reveal</button>':'<p class="mut">The reveal button appears when everyone has voted.</p>'));
+  return h+infoV();
+}
+function tally(){
+  const c=G.out.c,vb=G.out.vb||{},nv=G.out.nv||[],gv=G.out.gv||[],ks=Object.keys(c).sort((a,b)=>c[b]-c[a]);
+  if(!ks.length)return '<p class="mut">No votes were cast.</p>';
+  return `<p class="mut" style="margin-top:10px">The votes · tap a name to see who voted for them</p><div class="list">`+ks.map(k=>{const on=ui.vx===k;
+    return `<button class="opt${on?' sel':''}" data-a="voters" data-p="${esc(k)}" aria-expanded="${on}"><span>${esc(nm(k))}${on&&vb[k]?`<br><small style="white-space:normal">Voted by ${vb[k].map(i=>esc(nm(i))+(gv.includes(i)?' (ghost vote)':'')).join(', ')}</small>`:''}</span><b>${c[k]}</b></button>`}).join('')+`</div>`+
+    (nv.length?`<p class="mut">Didn't vote: ${nv.map(i=>esc(nm(i))).join(', ')}</p>`:'');
+}
+function hunterV(){
+  let h=`<h2>The Hunter's last shot</h2>`+card(`<p><b>${esc(nm(G.hp))}</b> was voted out, and they were the <b>Hunter</b>. Before they fall, they take someone with them.</p>`);
+  if(me.i===G.hp){const s=st.shot&&st.shot.rd===G.rd;
+    h+=!s&&ui.cf?cfV():s?card(st.shot.t==='-'?'<p>You missed your shot. No one was killed.</p>':'<p>Shot fired. Waiting…</p>'):card(`<p><b>Choose who to shoot.</b></p>${optList(alive().concat('-'),'t').replace('Skip (no one)','Miss your shot (no one is killed)')}<button class="pri big" data-a="shoot" ${ui.t?'':'disabled'}>${ui.t==='-'?'Miss my shot':'Fire'}</button>`)}
+  else h+=card(`<p>Waiting for the Hunter to take aim…</p>`);
+  if(me.host)h+=guideCard('"The Hunter takes aim…"',`<button data-a="skipShot">Skip the Hunter's shot</button>`);
+  return h;
+}
+function hbLines(){return (G.hb||[]).filter(i=>!(G.dead||[]).includes(i)||G.last!=='night').map(i=>deathLine(i,'died of a broken heart')).join('')}
+function outcome(){
+  let x='';
+  if(G.last==='night')x=G.dead.length?G.dead.map(i=>deathLine(i,'was killed in the night')).join(''):'<p>Everyone survived the night.</p>';
+  else if(G.out){x=G.out.p?deathLine(G.out.p,'was voted out'):'<p><b>No one was voted out</b> (a tie, or the town chose to skip).</p>';
+    if(G.shot)x+=G.shot.t?deathLine(G.shot.t,'was shot by the Hunter'):G.shot.f?`<p>The Hunter aimed at <b>${esc(nm(G.shot.aim))}</b>, but the shot failed (Nerf mode). No one was killed.</p>`:'<p>The Hunter missed their shot. No one was killed.</p>';x+=hbLines()+tally()}
+  else x+=hbLines();
+  if(G.last==='night')x+=hbLines();
+  return x;
+}
+function duskV(){
+  let h=`<h2>Dusk, day ${G.dn}</h2>`+card(outcome());
+  if(!mine().a)h+=outV();
+  if(me.host)h+=guideCard('"The sun is setting. Get ready for the night."',`<button class="pri big" data-a="toNight">Begin night ${G.dn+1}</button>`);
+  return h+infoV();
+}
+function overV(){
+  const m=G.win==='m',l=G.win==='l',d=G.win==='d',r=role(me.i),iWin=d?false:l?!!partner(me.i):m?(r==='mafia'||r==='fool'):(r!=='mafia'&&r!=='fool');
+  const why=G.early==='mafia'?'The Mafia have at least as many votes as everyone else, and no one left can stop them, so the game ends here.'
+    :G.early==='poison'?'Only one Mafia member is left, and the Witch Doctor knows who it is and still has their poison.'
+    :G.early==='stalemate'?'Only the Mafia and a Healer are left. The Healer protects themselves every night and every vote is a tie, so nobody can win.':null;
+  const fools=G.pl.filter(p=>role(p.i)==='fool');
+  let h=`<div class="win"><div class="disp">${d?"It's a draw":l?'The lovers win':m?'The Mafia wins':'The town wins'}</div><p>${why?why:l?`${esc(nm(G.lv[0]))} and ${esc(nm(G.lv[1]))} are the last two standing. Love beats everything.`:m?'Only the Mafia are left standing.':'Every member of the Mafia is gone.'}</p>`+
+    (m&&fools.length?`<p>The Fool (${fools.map(p=>esc(p.n)).join(', ')}) wins too!</p>`:'')+`<p><b>${d?'Nobody wins.':iWin?'You win!':'You lose.'}</b></p></div>`;
+  h+=card(outcome())+rolesList();
+  h+=me.host?`<button class="pri big" data-a="again">Play again</button>`:'<p class="mut">Waiting for the guide to start another game…</p>';
+  return h;
+}
+function stepRow(label,val,a,r){return `<div class="row"><span>${label}</span><span class="step"><button data-a="${a}" data-r="${r}" data-d="-1" aria-label="Fewer ${label}">−</button><b>${val}</b><button data-a="${a}" data-r="${r}" data-d="1" aria-label="More ${label}">+</button></span></div>`}
+function settingsV(o,sv){
+  const on=!!o.nf,g=o.ng||0,sm='style="width:auto;padding:0 12px;min-height:44px;margin:0"';
+  let x=`<p><b>Extra settings</b></p><button class="opt${on?' sel':''}" data-a="nf" data-s="${sv}"><span>Nerf mode<br><small style="white-space:normal">Powers sometimes fail and do nothing</small></span><small>${on?'On':'Off'}</small></button>`;
+  if(on){
+    x+=`<button class="opt${g?' sel':''}" data-a="ngt" data-s="${sv}"><span>Global NERF<br><small style="white-space:normal">One chance for every role at once</small></span><small>${g?'On':'Off'}</small></button>`;
+    if(g)x+=stepRow('Global chance',g+'%','ngp',sv).replace(/data-r="(g|p)"/g,'data-s="$1"');
+    x+=`<div class="card ${g?'role':''}" style="margin:12px 0;padding:12px 14px"><p style="margin:0">${g?`<b>Global NERF is ON: every role below has a ${g}% chance to fail</b>, unless you give it its own level.`:'<b>Global NERF is OFF.</b> Only roles you give their own level below can fail.'}</p></div>`;
+    x+=`<p style="margin-top:6px"><b>Individual NERF levels</b></p><p class="mut">Give a role its own chance, from 0% (never fails) to 50%. This overrides the global NERF.</p>`+NERFABLE.map(k=>{const own=ownLvl(o,k);
+      return `<div class="row"><span>${R[k].n}<br><small class="mut">${own!==null?(own?'Own level':'Own level: never fails'):g?`Global ${g}%`:'Never fails'}</small></span><span class="step">`+
+        (own!==null?`<button data-a="nfk" data-s="${sv}" data-r="${k}" data-d="-1" aria-label="Lower ${R[k].n} chance">−</button><b>${own}%</b><button data-a="nfk" data-s="${sv}" data-r="${k}" data-d="1" aria-label="Raise ${R[k].n} chance">+</button><button ${sm} data-a="nfr" data-s="${sv}" data-r="${k}">Clear</button>`
+        :`<button ${sm} data-a="nfr" data-s="${sv}" data-r="${k}">Set level</button>`)+`</span></div>`}).join('');
+  }
+  if(on)x+=`<button class="opt${o.sg?' sel':''}" data-a="sgm" data-s="${sv}"><span>Guessing Seer<br><small style="white-space:normal">The Seer must guess the role of the person they check. A right guess is confirmed. A wrong guess only tells them it was wrong.</small></span><small>${o.sg?'On':'Off'}</small></button>`;
+  if(on)x+=`<button class="opt${o.ah?' sel':''}" data-a="ah" data-s="${sv}"><span>Alternating healer<br><small style="white-space:normal">The Healer and Witch Doctor can't protect the same person two nights in a row. They can pick that person again after that.</small></span><small>${o.ah?'On':'Off'}</small></button>`;
+  x+=`<p style="margin-top:16px"><b>Buffs</b></p><button class="opt${o.gh?' sel':''}" data-a="gh" data-s="${sv}"><span>Ghosts<br><small style="white-space:normal">When a player dies, there's a 50% chance they become a ghost. Ghosts skip the normal death screen and keep playing, with one extra vote to use in a daytime vote and no other powers.</small></span><small>${o.gh?'On':'Off'}</small></button>`;
+  if(o.gh){
+    x+=`<p style="margin-top:6px"><b>Ghost chance per character</b></p><p class="mut">Every character has a 50% chance unless you give it its own, from 0% (never a ghost) to 100% (always a ghost).</p>`+GHOSTABLE.map(k=>{const own=ownGh(o,k);
+      return `<div class="row"><span>${R[k].n}<br><small class="mut">${own!==null?'Own chance':'50% (default)'}</small></span><span class="step">`+
+        (own!==null?`<button data-a="ghk" data-s="${sv}" data-r="${k}" data-d="-1" aria-label="Lower ${R[k].n} ghost chance">−</button><b>${own}%</b><button data-a="ghk" data-s="${sv}" data-r="${k}" data-d="1" aria-label="Raise ${R[k].n} ghost chance">+</button><button ${sm} data-a="ghr" data-s="${sv}" data-r="${k}">Clear</button>`
+        :`<button ${sm} data-a="ghr" data-s="${sv}" data-r="${k}">Set chance</button>`)+`</span></div>`}).join('');
+  }
+  x+=`<p style="margin-top:16px"><b>Other</b></p><button class="opt${o.ne?'':' sel'}" data-a="nee" data-s="${sv}"><span>End the game when the result is certain<br><small style="white-space:normal">For example 2 Mafia against 2 Peasants: the vote will tie and the Mafia win the next night, so the game ends now. Not while a Healer, Witch Doctor, Hunter, unused Shuffler or a pair of lovers could still change things. Also ends a game that can only be a draw.</small></span><small>${o.ne?'Off':'On'}</small></button>`;
+  x+=`<button class="opt${o.nt?'':' sel'}" data-a="nt" data-s="${sv}"><span>Night timer<br><small style="white-space:normal">After 40 seconds, a 20-second countdown starts. Anyone who hasn't chosen is skipped.</small></span><small>${o.nt?'Off':'On'}</small></button>`;
+  x+=`<button class="opt${o.nc?'':' sel'}" data-a="nc" data-s="${sv}"><span>Ask "Are you sure?" before every vote and power</span><small>${o.nc?'Off':'On'}</small></button>`;
+  return card(x);
+}
+function lobbyV(){
+  const n=G.lob.length,mode=G.mode||'std';
+  let h=`<h2>At the table</h2><p class="mut">${n} player${n===1?'':'s'} joined · ${MODES[mode][0]} mode</p>`+card(G.lob.map(p=>`<div class="row"><span>${esc(p.n)}${p.i===me.i?' <span class="tag">you</span>':''}</span>${me.host&&p.i!==me.i?`<span>${rnBtn(p.i)} <button class="link" data-a="kick" data-p="${esc(p.i)}">${ui.sure==='kick:'+p.i?'Tap again to remove':'Remove'}</button></span>`:''}</div>`).join('')||'<p class="mut">No one yet.</p>');
+  if(!me.host)return h+`<p class="mut">${MODES[mode][1]}</p><p class="mut">Waiting for the guide to deal the cards…</p>`+rulesV();
+  h=`<div class="card guide"><p>Everyone opens this page, taps <b>Start playing</b> and enters this code:</p><div class="code">${esc(G.code)}</div></div>`+h;
+  let c=`<p><b>Play style</b></p><div class="list">`+Object.keys(MODES).map(k=>`<button class="opt${k===mode?' sel':''}" data-a="mode" data-r="${k}"><span>${MODES[k][0]}</span><small>${k===mode?'Selected':''}</small></button>`).join('')+`</div><p class="mut">${MODES[mode][1]}</p>`;
+  let ok=n>=4;
+  if(mode==='std'){
+    const st=setup(),sp=ORDER.reduce((a,k)=>a+(st[k]||0),0);ok=ok&&sp<=n&&st.mafia>=1;
+    c+=`<p style="margin-top:14px"><b>Roles</b> <span class="mut">(${G.setup?'your picks':'suggested for '+n+' players'})</span></p>`+ORDER.map(k=>stepRow(R[k].n,st[k]||0,'cnt',k)).join('')+
+      `<div class="row"><span>Peasant</span><b style="padding-right:56px">${Math.max(0,n-sp)}</b></div>`+(sp>n?'<p class="err">More special roles than players.</p>':'')+
+      (G.setup?'<button class="link" data-a="auto">Back to suggested roles</button>':'');
+  }else if(mode==='rnd'){
+    const [mn,mx]=rng(Math.max(n,4)),must=poolMust(),ex=G.ex||[];
+    const lvl=k=>G.pool&&G.pool[k]===0?'Never':G.pool&&G.pool[k]===2?'Always':'Maybe';
+    c+=`<p style="margin-top:14px"><b>Number of Mafia</b> <span class="mut">(max ${maxMafia(Math.max(n,4))} for ${n} players)</span></p>`+stepRow('At least',mn,'rng','0')+stepRow('At most',mx,'rng','1')+
+      `<p style="margin-top:14px"><b>Roles that might appear</b></p><p class="mut">Tap a role to switch between <b>Maybe</b>, <b>Always</b> (guaranteed to be in the game) and <b>Never</b>.</p><div class="list">`+
+      SPECIAL.map(k=>{const l=lvl(k);return `<button class="opt${l!=='Never'?' sel':''}" data-a="pool" data-r="${k}"><span>${R[k].n}</span><small${l==='Always'?' style="color:var(--acc);font-weight:700"':''}>${l}</small></button>`}).join('')+`</div><p class="mut">Any empty seats become Peasants.</p>`;
+    const opts=v=>SPECIAL.map(k=>`<option value="${k}"${k===v?' selected':''}>${R[k].n}</option>`).join('');
+    c+=`<p style="margin-top:14px"><b>Never in the same game</b></p>`+
+      (ex.length?ex.map((pr,ix)=>`<div class="row"><span>${R[pr[0]].n} + ${R[pr[1]].n}</span><button class="link" data-a="exdel" data-r="${ix}">Remove</button></div>`).join('')
+        :'<p class="mut">No rules yet. For example: never a Healer and a Witch Doctor together.</p>')+
+      `<div class="exrow"><select id="exa" aria-label="First role">${opts(ui.exA)}</select><span>+</span><select id="exb" aria-label="Second role">${opts(ui.exB)}</select><button data-a="exadd">Add</button></div>`;
+    const clash=ex.find(([a,b])=>must.includes(a)&&must.includes(b));
+    if(clash){c+=`<p class="err">${R[clash[0]].n} and ${R[clash[1]].n} are both set to Always, but they can't be in the same game.</p>`;ok=false}
+    if(n>=4&&must.length+mn>n){c+=`<p class="err">Too many Always roles: ${must.length} roles plus at least ${mn} Mafia is more than ${n} players.</p>`;ok=false}
+  }else{
+    const [mn,mx]=spRange(Math.max(n,4));
+    c+=`<p class="mut" style="margin-top:10px">With ${n} players: ${mn===mx?mn:mn+' to '+mx} Mafia, everyone else gets a power. Roles can repeat in big groups.</p>`;
+  }
+  c+=`<button class="opt" data-a="rev" style="margin-top:14px"><span>Reveal a player's role when they die</span><small>${G.rev?'On':'Off'}</small></button>`;
+  return h+card(c)+settingsV(G,'g')+`<button class="pri big" data-a="deal" ${ok?'':'disabled'}>${n<4?'Need at least 4 players':'Deal the cards'}</button>`;
+}
+function helpV(){
+  const inGame=G&&G.ro&&(!G.mode||G.mode==='std')?new Set(Object.values(G.ro).map(r=>r[0])):null;
+  const nfr=G&&G.nf?NERFABLE.filter(k=>nfPct(G,k)).map(k=>`${R[k].n} ${nfPct(G,k)}%`):[];
+  const nfOn=nfr.length>0;
+  const extra=[G&&!G.ne?'<p><b>Early end is on.</b> The game ends as soon as the result is certain, for example when the Mafia have as many votes as everyone else and no Healer, Witch Doctor, Hunter, unused Shuffler or lovers are left to stop them.</p>':'',G&&G.nf&&G.sg?'<p><b>Guessing Seer is on.</b> The Seer must guess the role of the person they check. A right guess is confirmed; a wrong guess only tells them it was wrong.</p>':'',G&&G.nf&&G.ah?'<p><b>Alternating healer is on.</b> The Healer and Witch Doctor can\'t protect the same person two nights in a row.</p>':'',
+    G&&G.gh?`<p><b>Ghosts are on.</b> When someone dies, there's a chance they become a ghost (${GHOSTABLE.some(k=>ownGh(G,k)!==null)?GHOSTABLE.map(k=>`${R[k].n} ${ghostPct(G,k)}%`).join(', '):'50%'}). Ghosts keep playing with one extra vote to use in a daytime vote, and no other powers.</p>`:''].join('');
+  return `<h2>How the roles work</h2>`+(extra?card(extra):'')+(nfOn?card(`<p><b>Nerf mode is on.</b> Each time these roles use their power, there's a chance it fails and does nothing: ${nfr.join(', ')}.</p>`):'')+(inGame?'<p class="mut">Roles marked "in this game" are in play right now.</p>':'')+
+    card(ORDER.concat('peasant').map(k=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)"><b>${R[k].n}</b>${inGame&&inGame.has(k)?' <span class="tag">in this game</span>':''}<p class="mut" style="margin:4px 0 0">${R[k].d}</p></div>`).join('')+
+    `<div style="padding-top:10px"><b>Winning</b><p class="mut" style="margin:4px 0 0">The town wins when every Mafia member is gone. The Mafia win when only Mafia are left (the Fool wins with them). Lovers on opposite sides win if they're the last two alive.</p></div>`)+
+    `<button class="pri big" data-a="help">Back to the game</button>`;
+}
+function gameV(){
+  if(ui.leaving)return card('<p><b>Leaving the game…</b></p><p class="mut">Telling the guide you left.</p>');
+  let h=bar()+renameV()+sfxV();
+  if(ui.help)return h+helpV();
+  if(!G)return h+card(`<p>${conn?'Connected. Waiting for the guide…':'Connecting to game '+esc(me.code)+'…'}</p>`+(err?`<p class="err">${esc(err)}</p>`:''));
+  if(err)h+=`<p class="err">${esc(err)}</p>`;
+  if(G.ph==='lobby')return h+lobbyV();
+  if(!mine())return h+card('<p>A game is already under way. You\'ll be dealt in when the guide starts the next one.</p>');
+  return h+({night:nightV,morning:morningV,day:dayV,hunter:hunterV,dusk:duskV,over:overV}[G.ph]||(()=>''))();
+}
+function render(){
+  document.body.className=G&&ui.scr==='game'&&['morning','day','hunter','dusk'].includes(G.ph)?'day':'';
+  const h=ui.scr==='home'?homeV():ui.scr==='join'?joinV():ui.scr==='practice'?practiceV():ui.scr==='nettest'?netV():gameV();
+  if(h!==lastHtml){
+    const f=document.activeElement,fid=f&&app.contains(f)&&f.id?f.id:null,s0=fid&&f.selectionStart!=null?[f.selectionStart,f.selectionEnd]:null;
+    const y=window.scrollY;app.innerHTML=h;lastHtml=h;window.scrollTo(0,y);
+    if(fid){const g=document.getElementById(fid);if(g){try{g.focus({preventScroll:true});if(s0)g.setSelectionRange(s0[0],s0[1])}catch(e){}}}}
+}
+function toast(m){let t=document.querySelector('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t)}t.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),2600)}
+
+function kickPlayer(id){
+  if(!me.host||!G||G.ph!=='lobby'||id===me.i)return;
+  G.kk=(G.kk||[]).concat(id);
+  const m=Object.assign({},players);delete m[id];onNet(m,null);
+}
+function enter(){st={i:me.i,n:me.n};ui.scr='game';err='';lastSent='';render();connect()}
+function leave(){
+  if(ui.leaving)return;
+  let p=null;if(net&&net.bye&&!me.host)try{p=net.bye()}catch(e){}
+  me.code='';me.host=false;saveMe();
+  const go=()=>{try{location.reload()}catch(e){}};
+  if(p){ui.leaving=true;render();p.then(go,go)}else go();
+}
+
+/* ---------- events ---------- */
+app.addEventListener('change',e=>{if(e.target.id==='exa')ui.exA=e.target.value;if(e.target.id==='exb')ui.exB=e.target.value});
+app.addEventListener('input',e=>{if(e.target.id==='rnn')ui.rnn=e.target.value;if(e.target.id==='sfx')ui.sfxv=e.target.value;if(e.target.id==='nm')ui.name=e.target.value;if(e.target.id==='cd')ui.code=e.target.value.toUpperCase().replace(/[^A-Z]/g,'')});
+document.addEventListener('pointerdown',unlock);
+app.addEventListener('toggle',e=>{if(e.target.id==='pt')ui.ptOpen=e.target.open},true);
+app.addEventListener('click',e=>{
+  unlock();
+  const b=e.target.closest('[data-a]');if(!b||b.disabled)return;
+  const a=b.dataset.a,p=b.dataset.p,r=b.dataset.r,k=b.dataset.k;
+  const confirmTwice=key=>{if(!allDone()&&ui.sure!==key){ui.sure=key;render();return false}ui.sure='';return true};
+  if(a!=='leave'&&ui.sure==='leave')ui.sure='';
+  if(a!=='kick'&&String(ui.sure).startsWith('kick:'))ui.sure='';
+  ui.notice='';
+  switch(a){
+    case 'start':ui.mode='join';ui.scr='join';err='';break;
+    case 'hostnew':ui.mode='host';ui.scr='join';err='';break;
+    case 'home':ui.scr='home';err='';break;
+    case 'create':{const n=(ui.name||'').trim();if(!n){err='Enter your name.';break}
+      me.n=n.slice(0,16);me.host=true;me.code=newCode();freshGame=Date.now();saveMe();acts={};players={};
+      G={ph:'lobby',code:me.code,setup:null,ng:20,rev:1,fp:1,lob:[],rd:rid(),dn:0};enter();return}
+    case 'join':{const n=(ui.name||'').trim(),c=(ui.code||'').trim();if(!n){err='Enter your name.';break}if(c.length!==4){err='The game code has 4 letters.';break}
+      me.n=n.slice(0,16);me.host=false;me.code=c;saveMe();G=null;enter();return}
+    case 'practice':ui.scr='practice';err='';break;
+    case 'kick':if(ui.sure!=='kick:'+p){ui.sure='kick:'+p;break}ui.sure='';kickPlayer(p);break;
+    case 'sfxo':if(!me.host||!G||G.ph!=='lobby')break;ui.sfxFor=p;ui.sfxv='';break;
+    case 'sfxc':ui.sfxFor=null;break;
+    case 'sfxs':case 'sfxr':case 'sfxd':{const i=ui.sfxFor;if(!i)break;const v=(ui.sfxv||'').trim();if(a!=='sfxd'&&!v){toast('Type something first.');break}
+      G.sfx=Object.assign({},G.sfx);G.nmx=Object.assign({},G.nmx);
+      if(a==='sfxd'){delete G.sfx[i];delete G.nmx[i]}else if(a==='sfxs')G.sfx[i]=v.slice(0,14);else{G.nmx[i]=v.slice(0,16);delete G.sfx[i]}
+      ui.sfxFor=null;ui.sfxv='';push();return}
+    case 'rnq':if(!me.host||!G||G.ph!=='lobby'||p===me.i)break;G.rn=Object.assign({},G.rn,{[p]:Date.now()});push();return;
+    case 'rnsave':{const n=(ui.rnn||'').trim().slice(0,16);if(!n){toast('Type a new name.');break}if(n===me.n){toast('Pick a different name.');break}
+      me.n=n;ui.name=n;saveMe();st.n=n;st.rnd=G.rn[me.i];ui.rnn='';push();return}
+    case 'rejoin':{const r=ui.rejoin;if(!r)break;me={i:rid(),n:r.n,code:r.c,host:false};ui.name=r.n;ui.rejoin=null;saveMe();G=null;enter();return}
+    case 'nettest':ui.scr='nettest';err='';runNetTest();return;
+    case 'pbots':ui.bots=Math.max(3,Math.min(14,ui.bots+(+b.dataset.d)));break;
+    case 'pmode':ui.pmode=r;break;
+    case 'prole':ui.prole=r;break;
+    case 'pstart':startPractice();break;
+    case 'myrole':setMyRole(r);hostTick();break;
+    case 'comp':ui.comp=!ui.comp;break;
+    case 'help':ui.help=!ui.help;try{window.scrollTo(0,0)}catch(e){}break;
+    case 'voters':ui.vx=ui.vx===p?null:p;break;
+    case 'revive':{const p=mine();if(p){p.a=1;if(G.gs)delete G.gs[me.i];if(G.ph==='over'){G.ph='dusk';G.win=null}}hostTick();break}
+    case 'hunterhome':ui.prole='hunter';startPractice();// falls through to the Hunter test
+    case 'thunter':{if(G.ph==='lobby')break;setMyRole('hunter');const p=mine();if(p)p.a=1;G.win=null;if(!G.dn)G.dn=1;
+      G.ph='day';G.rd=rid();const rd=G.rd;
+      Object.keys(players).filter(k=>k.startsWith('bot')&&isAlive(k)).forEach(k=>{players[k]=Object.assign({},players[k],{vote:{rd,t:me.i}})});
+      st.vote={rd,t:'-'};hostTick();resolveVote();ui.ptOpen=false;push();window.scrollTo(0,0);return}
+    case 'voteme':ui.voteMe=!ui.voteMe;break;
+    case 'deadhome':ui.prole='random';startPractice();testDie(false);hostTick();onGame();window.scrollTo(0,0);break;
+    case 'tdie':testDie(false);hostTick();onGame();window.scrollTo(0,0);break;
+    case 'tghost':testDie(true);hostTick();onGame();window.scrollTo(0,0);break;
+    case 'peek':ui.peek=!ui.peek;break;
+    case 'pexit':try{location.reload()}catch(e){}return;
+    case 'leave':if(ui.sure!=='leave'){ui.sure='leave';break}leave();return;
+    case 'role':ui.showRole=!ui.showRole;break;
+    case 'seeall':ui.seeAll=!ui.seeAll;break;
+    case 'sel':if(k==='sw'||k==='lv'){const s=ui[k];ui[k]=s.includes(p)?s.filter(x=>x!==p):s.concat(p).slice(-2)}else{ui[k]=ui[k]===p?null:p;if(G&&G.ph==='night'&&k==='t'&&shown(me.i)==='mafia'&&!teammates().some(q=>q.a)){st.mp=ui.t?{rd:G.rd,t:ui.t}:null;if(st.act&&st.act.t!==ui.t)st.act=null;push();return}}break;
+    case 'sguess':ui.g=ui.g===r?null:r;break;
+    case 'wpro':ui.t=ui.t===p?null:p;if(ui.k===p)ui.k=null;break;
+    case 'wkill':ui.k=ui.k===p?null:p;if(ui.t===p)ui.t=null;ui.kill=!!ui.k;break;
+    case 'tkill':ui.kill=!ui.kill;if(!ui.kill)ui.k=null;break;
+    case 'act':{if(b.dataset.x==='mkill'){if(!G.agp)break;ui.t=G.agp}
+      if(!G.nc&&!b.dataset.ok){ui.cf={a:'act',x:b.dataset.x||''};break}ui.cf=null;const s=shown(me.i),x={rd:G.rd};
+      if(s==='cupid'&&G.dn===0){x.t='-';x.lv=ui.lv.slice(0,2)}
+      else if(s==='shuffler'&&!G.su[me.i]){x.t='-';if(b.dataset.x!=='pass')x.sw=ui.sw.slice(0,2)}
+      else{x.t=ui.t;if(s==='witch'&&ui.kill&&ui.k)x.k=ui.k;if(s==='seer'&&seerGuess()){if(!ui.g)break;x.g=ui.g}}
+      st.act=x;push();return}
+    case 'undo':st.act=null;push();return;
+    case 'vote':if(!ui.v||(st.vote&&st.vote.rd===G.rd))return;if(!G.nc&&!b.dataset.ok){ui.cf={a:'vote'};break}st.vote={rd:G.rd,t:ui.v};ui.cf=null;push();return;
+    case 'msug':if(!ui.t)break;st.mp={rd:G.rd,t:ui.t,at:hostNow()};st.act=null;push();return;
+    case 'magree':{const L=latestSug();if(!L)break;st.mp={rd:G.rd,t:L.t,at:L.at};st.act=null;ui.t=L.t;push();return}
+    case 'mother':{const L=latestSug();if(L)ui.dis=L.by+L.t+L.at;break}
+    case 'cfback':ui.cf=null;break;
+    case 'shoot':if(!ui.t)return;if(!G.nc&&!b.dataset.ok){ui.cf={a:'shoot'};break}st.shot={rd:G.rd,t:ui.t};ui.cf=null;push();return;
+    /* guide */
+    case 'cnt':{const c=Object.assign({},setup());c[r]=Math.max(r==='mafia'?1:0,(c[r]||0)+(+b.dataset.d));G.setup=c;push();return}
+    case 'mode':G.mode=r;push();return;
+    case 'nf':case 'ngt':case 'ngp':case 'nfr':case 'nfk':case 'nc':case 'nt':case 'nee':case 'ah':case 'gh':case 'ghk':case 'ghr':case 'sgm':case 'fpt':{const o=b.dataset.s==='g'?G:ui.pc;
+      if(a==='nf'){o.nf=o.nf?0:1;if(o.ng===undefined)o.ng=20}
+      if(a==='ngt')o.ng=o.ng?0:20;
+      if(a==='ngp')o.ng=Math.max(10,Math.min(40,(o.ng||20)+5*(+b.dataset.d)));
+      if(a==='nfk'){const n=Object.assign({},o.nr||{});n[r]=Math.max(0,Math.min(50,(ownLvl(o,r)||0)+5*(+b.dataset.d)));o.nr=n}
+      if(a==='nfr'){const n=Object.assign({},o.nr||{});if(ownLvl(o,r)!==null)delete n[r];else n[r]=o.ng||20;o.nr=n}
+      if(a==='nc')o.nc=o.nc?0:1;
+      if(a==='nt')o.nt=o.nt?0:1;
+      if(a==='nee')o.ne=o.ne?0:1;
+      if(a==='ah')o.ah=o.ah?0:1;
+      if(a==='sgm')o.sg=o.sg?0:1;
+      if(a==='fpt')o.fp=o.fp?0:1;
+      if(a==='gh')o.gh=o.gh?0:1;
+      if(a==='ghk'){const n=Object.assign({},o.gr||{});n[r]=Math.max(0,Math.min(100,(ownGh(o,r)??50)+10*(+b.dataset.d)));o.gr=n}
+      if(a==='ghr'){const n=Object.assign({},o.gr||{});if(ownGh(o,r)!==null)delete n[r];else n[r]=50;o.gr=n}
+      if(b.dataset.s==='g'){push();return}break}
+    case 'rng':{const n=Math.max(G.lob.length,4),v=rng(n);v[+r]=Math.max(1,Math.min(maxMafia(n),v[+r]+(+b.dataset.d)));if(r==='0'&&v[0]>v[1])v[1]=v[0];if(r==='1'&&v[1]<v[0])v[0]=v[1];G.rng=v;push();return}
+    case 'pool':{const p=Object.assign({},G.pool||{}),cur=p[r]===0?0:p[r]===2?2:1;p[r]=cur===1?2:cur===2?0:1;G.pool=p;push();return}
+    case 'exadd':{const x=ui.exA,y=ui.exB;if(!x||!y||x===y){toast('Pick two different roles.');break}
+      const pr=[x,y].sort();G.ex=(G.ex||[]).filter(q=>q.join()!==pr.join()).concat([pr]);push();return}
+    case 'exdel':G.ex=(G.ex||[]).filter((q,ix)=>ix!==+r);push();return;
+    case 'auto':G.setup=null;push();return;
+    case 'rev':G.rev=G.rev?0:1;push();return;
+    case 'deal':startGame();push();return;
+    case 'wake':if(!allDone())return;resolveNight();push();return;
+    case 'toVote':G.ph='day';G.rd=rid();G.done=0;G.tot=alive().length;push();return;
+    case 'reveal':if(!allDone())return;resolveVote();push();return;
+    case 'skipShot':G.ph='dusk';G.rd=rid();checkWin();push();return;
+    case 'toNight':toNight();push();return;
+    case 'again':G={ph:'lobby',code:G.code,setup:G.setup,mode:G.mode,nf:G.nf,ng:G.ng,nr:G.nr,nc:G.nc,nt:G.nt,ne:G.ne,ah:G.ah,sg:G.sg,gh:G.gh,gr:G.gr,fp:G.fp,ex:G.ex,rng:G.rng,pool:G.pool,rev:G.rev,sfx:G.sfx,nmx:G.nmx,lob:[],rd:rid(),dn:0};ui.showRole=false;push();return;
+  }
+  render();
+});
+
+setInterval(()=>{
+  if(!G||ui.scr!=='game')return;
+  if(me.host&&G.ph==='night'&&G.t0&&!G.to&&!G.nt){
+    if(Date.now()-G.t0>=60000){G.to=1;hostTick();onGame()}
+    else if(Date.now()-G.hnow>4000){G.hnow=Date.now();hostTick()}
+  }
+  if(G.ph==='night')render();
+},500);
+
+/* ---------- boot ---------- */
+if(me.code&&me.n){
+  if(me.host){const g=ld('mf_G',null);G=g&&g.code===me.code?g:{ph:'lobby',code:me.code,setup:null,rev:1,lob:[],rd:rid(),dn:0};acts=ld('mf_acts',{});
+    const mine=acts[me.i];if(mine)st=Object.assign({},mine,{n:me.n})}
+  const ss=ld('mf_st',null);if(ss&&ss.i===me.i)st=Object.assign({},ss,{n:me.n});
+  ui.scr='game';lastRd=G?G.rd:'';onGame();render();connect();
+}else{
+try{const k0=sessionStorage.getItem('mf_kicked');if(k0){sessionStorage.removeItem('mf_kicked');let k=null;try{k=JSON.parse(k0)}catch(x){k={c:k0,n:me.n}}if(typeof k==='string')k={c:k,n:me.n};ui.notice=`The guide removed you from game ${k.c}.`;ui.rejoin=k}}catch(e){}
+  render();
+}
+}
+</script>
+</body>
+</html>
